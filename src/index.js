@@ -10,31 +10,126 @@ const esc = v =>
     "'": '&#39;'
   }[c]));
 
-const LABELS = {
-  name: 'Candidate Name',
-  aadhaar: 'Aadhaar Number',
-  father: 'Father / Guardian Name',
-  dob: 'Date of Birth',
-  enrollment_no: 'Enrollment Number',
-  job_role: 'Job Role',
-  duration: 'Training Duration',
-  training_centre: 'Training Centre',
-  district: 'District',
-  state: 'State',
-  assessment_partner: 'Assessment Partner',
-  grade: 'Grade',
-  place_of_issue: 'Place of Issue',
-  date_of_issue: 'Date of Issue',
-  certificate_no: 'Certificate Number'
+/* =====================================================
+   EXACT CERTIFICATE FIELD ORDER
+===================================================== */
+
+const FIELD_ORDER = [
+  ['certificate_no', 'CertificateNo'],
+  ['name', 'Name'],
+  ['aadhaar', 'AadharNo'],
+  ['father', 'SonOrDaughterOf'],
+  ['dob', 'DOB'],
+  ['enrollment_no', 'Enrollment'],
+  ['job_role', 'Job Role'],
+  ['duration', 'Duration'],
+  ['training_centre', 'Training Centre'],
+  ['district', 'District'],
+  ['state', 'State'],
+  ['assessment_partner', 'Assessment Partner'],
+  ['grade', 'Grade'],
+  ['place_of_issue', 'Place of Issue'],
+  ['date_of_issue', 'Date of Issue']
+];
+
+const ALIASES = {
+  certificate_no: [
+    'certificate_no', 'CertificateNo', 'certificateNo',
+    'Certificate Number'
+  ],
+  name: [
+    'name', 'Name', 'CandidateName', 'candidate_name'
+  ],
+  aadhaar: [
+    'aadhaar', 'AadharNo', 'aadhaar_no',
+    'AadhaarNo', 'Aadhaar Number', 'aadhar'
+  ],
+  father: [
+    'father', 'SonOrDaughterOf', 'FatherName',
+    'father_name', 'son_or_daughter_of',
+    'Son/Daughter Of'
+  ],
+  dob: [
+    'dob', 'DOB', 'DateOfBirth', 'date_of_birth',
+    'Date of Birth'
+  ],
+  enrollment_no: [
+    'enrollment_no', 'Enrollment', 'EnrollmentNo',
+    'enrollment', 'Enrollment Number'
+  ],
+  job_role: [
+    'job_role', 'JobRole', 'Job Role'
+  ],
+  duration: [
+    'duration', 'Duration', 'TrainingDuration',
+    'training_duration'
+  ],
+  training_centre: [
+    'training_centre', 'TrainingCentre',
+    'Training Centre', 'training_center'
+  ],
+  district: ['district', 'District'],
+  state: ['state', 'State'],
+  assessment_partner: [
+    'assessment_partner', 'AssessmentPartner',
+    'Assessment Partner'
+  ],
+  grade: ['grade', 'Grade'],
+  place_of_issue: [
+    'place_of_issue', 'PlaceOfIssue', 'Place of Issue'
+  ],
+  date_of_issue: [
+    'date_of_issue', 'DateOfIssue', 'Date of Issue'
+  ]
 };
 
-const humanize = key =>
-  LABELS[key] ||
-  String(key).replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase());
+/* =====================================================
+   READ FIELD WITH ALIASES
+===================================================== */
+
+function getField(data, key) {
+  const aliases = ALIASES[key] || [key];
+
+  for (const alias of aliases) {
+    const value = data?.[alias];
+
+    if (
+      value !== undefined &&
+      value !== null &&
+      String(value).trim() !== ''
+    ) {
+      return value;
+    }
+  }
+
+  return '';
+}
 
 /* =====================================================
-   QR TOKEN EXTRACTION
+   RENDER ALL 15 FIELDS IN FIXED ORDER
+===================================================== */
+
+function allDataRows(data, certificateNo) {
+  const completeData = {
+    ...data,
+    certificate_no:
+      getField(data, 'certificate_no') || certificateNo
+  };
+
+  return FIELD_ORDER.map(([key, label]) => {
+    const value = getField(completeData, key);
+
+    return `
+      <div class="detail">
+        <div class="k">${esc(label)}</div>
+        <div class="v">${esc(value || '—')}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* =====================================================
+   EXTRACT TOKEN FROM QR LINK
 ===================================================== */
 
 function extractToken(url) {
@@ -56,56 +151,20 @@ function extractToken(url) {
 
   token = token.replace(/\/+$/, '');
 
-  // Support QR links containing a complete URL.
+  // Support a complete old URL inside the QR path.
   if (/^https?:\/\//i.test(token)) {
     try {
-      const oldUrl = new URL(token);
-      return extractToken(oldUrl);
+      return extractToken(new URL(token));
     } catch {
       return '';
     }
   }
 
-  // Accept old and new ICES tokens.
   return TOKEN_RE.test(token) ? token : '';
 }
 
 /* =====================================================
-   DISPLAY ALL SAVED CANDIDATE DETAILS
-===================================================== */
-
-function allDataRows(value, prefix = '') {
-  if (value === null || value === undefined || value === '') {
-    return '';
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((v, i) =>
-      allDataRows(v, `${prefix} ${i + 1}`)
-    ).join('');
-  }
-
-  if (typeof value === 'object') {
-    return Object.entries(value).map(([k, v]) =>
-      allDataRows(
-        v,
-        prefix
-          ? `${prefix} / ${humanize(k)}`
-          : humanize(k)
-      )
-    ).join('');
-  }
-
-  return `
-    <div class="detail">
-      <div class="k">${esc(prefix || 'Detail')}</div>
-      <div class="v">${esc(value)}</div>
-    </div>
-  `;
-}
-
-/* =====================================================
-   ICES STATIC VERIFICATION PAGE
+   STATIC ICES VERIFICATION PAGE
 ===================================================== */
 
 function page(title, body, status = 200) {
@@ -188,8 +247,6 @@ body {
   color: #16834a;
   display: grid;
   place-items: center;
-  font-size: 42px;
-  font-weight: bold;
 }
 
 .tick svg {
@@ -312,7 +369,7 @@ function fail(message, status = 404) {
 }
 
 /* =====================================================
-   SUPABASE CERTIFICATE VERIFICATION
+   VERIFY CERTIFICATE USING SUPABASE
 ===================================================== */
 
 async function verify(token, env) {
@@ -321,9 +378,12 @@ async function verify(token, env) {
     return fail('The QR link is invalid or incomplete.');
   }
 
-  if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY) {
+  if (
+    !env.SUPABASE_URL ||
+    !env.SUPABASE_PUBLISHABLE_KEY
+  ) {
     return fail(
-      'Verification service is not configured. Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in Worker settings.',
+      'Verification service is not configured. Please configure the Supabase project URL and publishable key.',
       503
     );
   }
@@ -334,11 +394,10 @@ async function verify(token, env) {
     supabaseURL = new URL(env.SUPABASE_URL);
 
     if (supabaseURL.protocol !== 'https:') {
-      return fail('Invalid Supabase project URL configuration.', 503);
+      return fail('Invalid Supabase project URL.', 503);
     }
-
   } catch {
-    return fail('Invalid Supabase project URL configuration.', 503);
+    return fail('Invalid Supabase project URL.', 503);
   }
 
   let response;
@@ -348,28 +407,25 @@ async function verify(token, env) {
       new URL('/rest/v1/rpc/get_certificate', supabaseURL),
       {
         method: 'POST',
-
         headers: {
-          'apikey': env.SUPABASE_PUBLISHABLE_KEY,
+          apikey: env.SUPABASE_PUBLISHABLE_KEY,
           'Content-Type': 'application/json'
         },
-
         body: JSON.stringify({
           p_token: token
         })
       }
     );
-
   } catch {
     return fail(
-      'The verification database could not be reached. Please try again.',
+      'The verification database could not be reached.',
       502
     );
   }
 
   if (!response.ok) {
     return fail(
-      `Verification database error (${response.status}). Check the Supabase API key and get_certificate SQL function permissions.`,
+      `Verification database error (${response.status}). Check the Supabase API key and get_certificate function permissions.`,
       502
     );
   }
@@ -379,28 +435,27 @@ async function verify(token, env) {
   try {
     rec = await response.json();
   } catch {
-    return fail('Invalid response received from verification database.', 502);
+    return fail('Invalid database response.', 502);
   }
 
-  if (!rec || !rec.certificate_no || !rec.data) {
+  if (
+    !rec ||
+    !rec.certificate_no ||
+    !rec.data ||
+    typeof rec.data !== 'object'
+  ) {
     return fail(
       'No matching certificate record was found. Please contact ICES.'
     );
   }
 
   const revoked = rec.revoked === true;
-  const data = rec.data;
 
-  // Preserve and display every field saved in Supabase.
-  const completeData = {
-    ...data
-  };
-
-  if (!completeData.certificate_no) {
-    completeData.certificate_no = rec.certificate_no;
-  }
-
-  const rows = allDataRows(completeData);
+  // The exact requested field sequence.
+  const rows = allDataRows(
+    rec.data,
+    rec.certificate_no
+  );
 
   const body = `
     <div class="valid">
@@ -408,13 +463,15 @@ async function verify(token, env) {
       <div class="tick">
         ${
           revoked
-            ? '!'
+            ? '<span style="font-size:38px;color:#b42318">!</span>'
             : '<svg viewBox="0 0 52 52" fill="none"><path d="M10 27l11 11L42 15" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
         }
       </div>
 
       <h1>
-        ${revoked ? 'Certificate Revoked' : 'Verified Successfully'}
+        ${revoked
+          ? 'Certificate Revoked'
+          : 'Verified Successfully'}
       </h1>
 
       <p class="msg">
@@ -433,32 +490,26 @@ async function verify(token, env) {
       ${
         revoked && rec.revoked_reason
           ? `
-          <div class="detail">
-            <div class="k">Revocation Reason</div>
-            <div class="v">${esc(rec.revoked_reason)}</div>
-          </div>
+            <div class="detail">
+              <div class="k">Revocation Reason</div>
+              <div class="v">${esc(rec.revoked_reason)}</div>
+            </div>
           `
           : ''
       }
-
-      <div class="detail">
-        <div class="k">Verification Status</div>
-        <div class="v">
-          ${revoked ? 'REVOKED' : 'AUTHENTICATED'}
-        </div>
-      </div>
-
     </div>
   `;
 
   return page(
-    revoked ? 'Certificate Revoked' : 'Certificate Verified',
+    revoked
+      ? 'Certificate Revoked'
+      : 'Certificate Verified',
     body
   );
 }
 
 /* =====================================================
-   CLOUDFLARE WORKER ENTRY POINT
+   CLOUDFLARE WORKER
 ===================================================== */
 
 export default {
@@ -467,7 +518,6 @@ export default {
 
     const url = new URL(request.url);
 
-    // Public QR verification route.
     if (
       url.pathname === '/c' ||
       url.pathname.startsWith('/c/')
@@ -488,7 +538,9 @@ export default {
       const token = extractToken(url);
 
       if (!token) {
-        return fail('The QR link is invalid or incomplete.');
+        return fail(
+          'The QR link is invalid or incomplete.'
+        );
       }
 
       const result = await verify(token, env);
@@ -503,11 +555,11 @@ export default {
       return result;
     }
 
-    // All other requests go to the static certificate generator.
     if (!env.ASSETS) {
-      return new Response('ICES certificate application assets are not configured.', {
-        status: 503
-      });
+      return new Response(
+        'ICES application assets are not configured.',
+        { status: 503 }
+      );
     }
 
     return env.ASSETS.fetch(request);
