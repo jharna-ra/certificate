@@ -2835,7 +2835,9 @@ async function pdfZip(){
 /* ---- Online verification (Supabase) + Online records ---- */
 const VER=(()=>{
  const g=k=>(ls(k)||'').trim(),tok=new Map();let sess=null;
- const cfg=()=>({url:g('sbu').replace(/\/+$/,''),key:g('sbk'),site:g('vsite').replace(/\/+$/,''),email:g('sbe')});
+ const DEFAULT_SUPABASE_URL='https://unilpvfyblhmpzqqjwea.supabase.co';
+ const DEFAULT_SUPABASE_PUBLISHABLE_KEY='sb_publishable_4m1oPtIGkG-TKWfth8qFTQ_QvqCqbUw';
+ const cfg=()=>({url:(g('sbu')||DEFAULT_SUPABASE_URL).replace(/\/+$/,''),key:g('sbk')||DEFAULT_SUPABASE_PUBLISHABLE_KEY,site:g('vsite').replace(/\/+$/,''),email:g('sbe')});
  const enabled=()=>{const c=cfg();return !!(c.url&&c.key&&c.site)&&ls('vron')!=='0'};
  const urlOf=t=>cfg().site+'/c/'+t;
  const urlFor=r=>enabled()?urlOf(tok.get(r)||'PREVIEWTOKEN'):'';
