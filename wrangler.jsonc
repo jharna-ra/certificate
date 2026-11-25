@@ -1,9 +1,14 @@
+
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ices-certificate",
   "main": "./src/index.js",
   "compatibility_date": "2026-11-23",
-  "assets": { "directory": "./public", "binding": "ASSETS", "run_worker_first": ["/c", "/c/*"] },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/c", "/c/*"]
+  },
   "vars": {
     "SUPABASE_URL": "https://unilpvfyblhmpzqqjwea.supabase.co",
     "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_4m1oPtIGkG-TKWfth8qFTQ_QvqCqbUw"
