@@ -1,7 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><title>ICES Bulk Certificate Generator</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🎓%3C/text%3E%3C/svg%3E">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -69,14 +68,6 @@ button.b{background:var(--pri);color:var(--bg);border:0;padding:9px 16px;border-
 </main><div id="toast"></div>
 <script>
 const JSZip=window.JSZip;
-// ICES shared template library. Uses only the browser-safe publishable key.
-const ICES_SUPABASE_URL = 'https://unilpvfyblhmpzqqjwea.supabase.co';
-const ICES_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_4m1oPtIGkG-TKWfth8qFTQ_QvqCqbUw';
-const ICES_TEMPLATE_BUCKET = 'ices-templates';
-const ICES_CLOUD = (window.supabase && ICES_SUPABASE_URL && ICES_SUPABASE_PUBLISHABLE_KEY)
-  ? window.supabase.createClient(ICES_SUPABASE_URL, ICES_SUPABASE_PUBLISHABLE_KEY)
-  : null;
-
 //---------------------------------------------------------------------
 //
 // QR Code Generator for JavaScript
@@ -2405,6 +2396,7 @@ function eachParagraph(doc, fn) {
 /** Pass 1: genuine MERGEFIELD complex fields. Returns found names. */
 /* ---- Keep every value fully visible and centred in its box: no wrapping or clipping, font shrunk only if the value is too long ---- */
 const TOUCH = new Set();
+const ENROLLMENT_PARAS = new WeakSet();
 let DEFPT = 11, _defBuf = null;
 const EM_AFTER_SZ = ['w:highlight', 'w:u', 'w:effect', 'w:bdr', 'w:shd', 'w:fitText', 'w:vertAlign', 'w:rtl', 'w:cs', 'w:em', 'w:lang', 'w:eastAsianLayout', 'w:specVanish', 'w:oMath'];
 // Arial-compatible character widths (per 1000 em) for ASCII 32-126; other characters (for example Hindi) use 0.6 em.
@@ -2424,6 +2416,10 @@ function setSz(doc, run, halfPts) {
     el.setAttribute('w:val', String(halfPts));
   }
 }
+function isEnrollmentField(name) {
+  return ['enrollmentno','enrollmentnumber','enrolmentno','enrolmentnumber'].includes(canon(name));
+}
+function setEnrollment12(doc, run) { setSz(doc, run, 24); } // Word uses half-points: 24 = 12 pt
 function centerPara(doc, p) {
   let pPr = kids(p, 'w:pPr')[0];
   if (!pPr) { pPr = doc.createElementNS(NS.w, 'w:pPr'); p.insertBefore(pPr, p.firstChild); }
@@ -2442,13 +2438,13 @@ function fitTouched(doc) {
     TOUCH.delete(p);
     let box = null;
     for (let n = p; n; n = n.parentNode) if (n.nodeName === 'w:txbxContent') { box = n; break; }
-    if (!box || p.getElementsByTagName('w:drawing')[0]) continue;
+    if (!box || p.getElementsByTagName('w:drawing')[0] || ENROLLMENT_PARAS.has(p)) continue;
     const tb = box.parentNode; if (tb.nodeName !== 'wps:txbx') continue;
     const wsp = tb.parentNode, bp = wsp.getElementsByTagName('wps:bodyPr')[0];
     let cx = 0;
     for (let n = wsp; n; n = n.parentNode) if (n.nodeName === 'wp:anchor' || n.nodeName === 'wp:inline') { const e = n.getElementsByTagName('wp:extent')[0]; if (e) cx = Number(e.getAttribute('cx')); break; }
-    if (bp) { bp.setAttribute('wrap', 'none'); bp.setAttribute('lIns', '0'); bp.setAttribute('rIns', '0'); }
-    centerPara(doc, p);
+    // Preserve the Word template's own text-box wrapping, margins and paragraph alignment.
+    // Do not force alignment or alter the Enrollment Number placeholder.
     if (!cx) continue;
     const runs = kids(p, 'w:r').filter((r) => kids(r, 'w:t').length);
     const text = runs.map((r) => kids(r, 'w:t').map((t) => t.textContent).join('')).join('');
@@ -2547,9 +2543,7 @@ function shiftBox(el) {
 function replaceNodes(doc, nodes, model, name, val) {
   const anchor = nodes[0];
   const run = val === '[qr]' ? qrRun(doc, model) : textRun(doc, model, String(val ?? ''));
-  // Enrollment number must use 12 pt instead of inheriting the Word template's font size.
-  // Word stores font sizes in half-points, so 24 = 12 pt.
-  if (val !== '[qr]' && ['enrollmentno', 'enrollmentnumber', 'enrolmentno', 'enrolmentnumber'].includes(canon(name))) setSz(doc, run, 24);
+  if (val !== '[qr]' && isEnrollmentField(name)) { setEnrollment12(doc, run); ENROLLMENT_PARAS.add(anchor.parentNode); }
   anchor.parentNode.insertBefore(run, anchor);
   if (val !== '[qr]') TOUCH.add(anchor.parentNode);
   if (val === '[qr]') { trimLeadingBreaks(anchor.parentNode); zeroInsets(anchor.parentNode); shiftBox(anchor.parentNode); }
@@ -2601,6 +2595,7 @@ function processPlain(doc, resolve, found) {
         ts[si].textContent = pre + String(ed.val ?? '') + (si === ei ? post : '');
         ts[si].setAttribute('xml:space', 'preserve');
         if (si !== ei) ts[ei].textContent = post;
+        if (isEnrollmentField(ed.name)) { setEnrollment12(doc, runs[si]); ENROLLMENT_PARAS.add(runs[si].parentNode); }
         TOUCH.add(runs[si].parentNode);
       }
     }
@@ -2747,58 +2742,31 @@ async function saveFile(name,blob){try{const d=window.claude&&await claude.use('
  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
 // ---- templates ----
 let T=[];
-async function loadTpl(){
- const local=await all('templates');
- let shared=[];
- if(ICES_CLOUD){
-  try{
-   const {data:rows,error}=await ICES_CLOUD.from('ices_templates').select('*').order('created_at',{ascending:false});
-   if(error)throw error;
-   shared=await Promise.all((rows||[]).map(async r=>{
-    const {data:blob,error:de}=await ICES_CLOUD.storage.from(ICES_TEMPLATE_BUCKET).download(r.object_path);
-    if(de)throw de;
-    const buf=await blob.arrayBuffer();
-    let phs=[];try{phs=await detectPlaceholders(buf,env)}catch(e){}
-    return {id:'cloud:'+r.id,cloud:true,cloudId:r.id,name:r.name,data:buf,size:r.size_bytes||buf.byteLength,created:new Date(r.created_at).getTime(),phs};
-   }));
-  }catch(e){toast('Shared templates could not be loaded: '+(e.message||e),9000);console.error('ICES shared template load failed',e)}
- }
- T=[...shared,...local].sort((a,b)=>b.created-a.created);
- const cur=$('tplSel').value;
- $('tplSel').innerHTML=T.length?T.map(t=>`<option value="${t.id}">${esc(t.name)}${t.cloud?' · SHARED':' · THIS BROWSER'}</option>`).join(''):'<option value="">No templates available — upload one in Saved Templates</option>';
- if(cur&&T.some(t=>t.id===cur))$('tplSel').value=cur;
- $('tlist').innerHTML='<tr><th>Name</th><th>Storage</th><th>Fields</th><th>Size</th><th>Saved</th><th>Actions</th></tr>'+(T.map(t=>`<tr><td>${esc(t.name)}</td><td>${t.cloud?'<span class="ok">Shared globally</span>':'This browser only'}</td><td>${t.phs.length}</td><td>${mb(t.size)}</td><td>${new Date(t.created).toLocaleString()}</td><td><button class="b s" onclick="tAct('use','${t.id}')">Use</button> <button class="b s" onclick="tAct('prev','${t.id}')">Preview</button> <button class="b s" onclick="tAct('dl','${t.id}')">Download</button>${t.cloud?'':' <button class="b s" onclick="tAct(\'ren\',\''+t.id+'\')">Rename</button> <button class="b d" onclick="tAct(\'del\',\''+t.id+'\')">Delete</button>'}</td></tr>`).join('')||'<tr><td colspan="6" class="mut">No templates saved yet.</td></tr>');
- $('bkinfo').textContent=ICES_CLOUD?'Connected to shared ICES cloud template library.':'Cloud library unavailable; local templates only.';
- await onTpl();
-}
+async function loadTpl(){T=(await all('templates')).sort((a,b)=>b.created-a.created);const cur=$('tplSel').value;
+ $('tplSel').innerHTML=T.length?T.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join(''):'<option value="">No saved templates — add one in Saved Templates</option>';if(cur)$('tplSel').value=cur;
+ $('tlist').innerHTML='<tr><th>Name</th><th>Fields</th><th>Size</th><th>PDF layout</th><th>Saved</th><th></th></tr>'+(T.map(t=>`<tr><td>${esc(t.name)}</td><td>${t.phs.length}</td><td>${mb(t.size)}</td><td>${t.marks?'<span class="ok">Ready</span>':'<span class="warn">Not set</span>'}</td><td>${new Date(t.created).toLocaleString()}</td><td><button class="b s" onclick="tAct('use','${t.id}')">Use</button> <button class="b s" onclick="tAct('prev','${t.id}')">Preview</button> <button class="b s" onclick="tAct('ren','${t.id}')">Rename</button> <button class="b s" onclick="pdfSetup('${t.id}')">PDF layout</button> <button class="b s" onclick="tAct('dl','${t.id}')">Download</button> <button class="b d" onclick="tAct('del','${t.id}')">Delete</button></td></tr>`).join('')||'<tr><td colspan=6 class="mut">No templates saved yet.</td></tr>');
+ $('bkinfo').textContent=ls('lastBackup')?'Last backup file created: '+new Date(+ls('lastBackup')).toLocaleString():'No backup created yet.';await onTpl()}
 $('tfile').onchange=e=>{const f=e.target.files[0];if(f&&!$('tname').value.trim())$('tname').value=f.name.replace(/\.docx$/i,'').replace(/[_-]+/g,' ').trim()};
-$('tsave').onclick=async()=>{
- const f=$('tfile').files[0];let name=$('tname').value.trim();
- if(!f)return toast('Choose a Word (.docx) file first.',6000);if(!name)return toast('Type a name for this template.',6000);
- try{
-  if(f.size>25*1048576)throw Error('File is larger than 25 MB');
-  const buf=await f.arrayBuffer();const z=await JSZip.loadAsync(buf);
-  if(!z.file('word/document.xml')||!z.file('[Content_Types].xml'))throw Error('Not a valid Word .docx file');
+$('tsave').onclick=async()=>{const f=$('tfile').files[0];let name=$('tname').value.trim();if(!f)return toast('Choose a Word (.docx) file first.',6000);if(!name)return toast('Type a name for this template.',6000);
+ try{if(f.size>25*1048576)throw Error('File is larger than 25 MB');const buf=await f.arrayBuffer();const z=await JSZip.loadAsync(buf);if(!z.file('word/document.xml')||!z.file('[Content_Types].xml'))throw Error('Not a valid Word .docx file');
   const phs=await detectPlaceholders(buf,env);if(!phs.length)throw Error('No placeholders like «Name» or {Name} were found in this template');
-  if(!ICES_CLOUD)throw Error('Supabase client is not available. Check internet/CDN access and reload.');
-  const id=crypto.randomUUID(),objectPath=id+'.docx';
-  const {error:upErr}=await ICES_CLOUD.storage.from(ICES_TEMPLATE_BUCKET).upload(objectPath,new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),{contentType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',upsert:false});
-  if(upErr)throw upErr;
-  const {error:dbErr}=await ICES_CLOUD.from('ices_templates').insert({id,name,object_path:objectPath,size_bytes:buf.byteLength,placeholder_count:phs.length});
-  if(dbErr){await ICES_CLOUD.storage.from(ICES_TEMPLATE_BUCKET).remove([objectPath]);throw dbErr;}
-  await audit('template-add-shared',name);$('tname').value='';$('tfile').value='';await loadTpl();checkStorage();toast('Template uploaded to shared ICES library. All users can now see it.');
- }catch(e){console.error('ICES shared template upload failed',e);toast('Template upload failed: '+(e.message||e),9000)}
-};
+  const base=name;let v=1;while(T.some(t=>t.name===name))name=`${base} (v${++v})`;if(v>1)toast(`Name already used, saved as “${name}”. The old template is untouched.`);
+  const s=await checkStorage();if(s&&s.pct>=95)throw Error('Storage is at 95% or more. Free up space first.');
+  await put('templates',{id:uid(),name,data:buf,size:buf.byteLength,created:Date.now(),phs});await audit('template-add',name);$('tname').value='';$('tfile').value='';await loadTpl();checkStorage();toast('Template saved.')}catch(e){e.name==='QuotaExceededError'?fail(e):toast('Not saved: '+e.message,7000)}};
 window.tAct=async(a,id)=>{const t=T.find(x=>x.id===id);if(!t)return;
  if(a==='use'){$('tplSel').value=id;await onTpl();document.querySelector('[data-t=gen]').click()}
- if(a==='dl')saveFile(t.name+'.docx',new Blob([t.data],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
+ if(a==='dl')saveFile(t.name+'.docx',new Blob([t.data]));
  if(a==='prev'){document.querySelector('[data-t=gen]').click();$('pdoc').style.display='block';$('prevCard').style.display='block';renderDoc(t.data)}
- if(t.cloud&&(a==='ren'||a==='del'))return toast('Shared templates are centrally managed. Contact the ICES administrator.',7000);
  if(a==='ren'){const n=(prompt('New name',t.name)||'').trim();if(n&&n!==t.name){if(T.some(x=>x.name===n))return toast('That name already exists.');t.name=n;await put('templates',t).catch(fail);await audit('template-rename',n);loadTpl()}}
- if(a==='del'){const used=(await all('history')).filter(h=>h.templateId===id).length;if(!confirm(used?`This template is referenced by ${used} history record(s). Delete anyway?`:`Delete template “${t.name}”? Download a backup first if unsure.`))return;await del('templates',id);await audit('template-delete',t.name);loadTpl();checkStorage()}
-};
-$('tbk').onclick=async()=>{const local=await all('templates');if(!local.length)return toast('No local templates to back up. Shared templates are already stored in the cloud.');const z=new JSZip();z.file('manifest.json',JSON.stringify(local.map(t=>({file:t.id+'.docx',name:t.name,created:t.created}))));local.forEach(t=>z.file(t.id+'.docx',t.data));const b=await z.generateAsync({type:'blob'});await saveFile(`ices-templates-backup-${new Date().toISOString().slice(0,10)}.zip`,b);ls('lastBackup',Date.now());$('bkinfo').textContent='Local backup created '+new Date().toLocaleString()+'.'};
-$('trs').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const z=await JSZip.loadAsync(await f.arrayBuffer()),m=JSON.parse(await z.file('manifest.json').async('string'));let n=0;for(const it of m){const entry=z.file(it.file);if(!entry)continue;const buf=await entry.async('arraybuffer'),zz=await JSZip.loadAsync(buf);if(!zz.file('word/document.xml'))continue;const phs=await detectPlaceholders(buf,env);let name=it.name;const base=name;let v=1;while(T.some(t=>t.name===name))name=`${base} (restored ${++v})`;if(ICES_CLOUD){const id=crypto.randomUUID(),objectPath=id+'.docx';const {error:upErr}=await ICES_CLOUD.storage.from(ICES_TEMPLATE_BUCKET).upload(objectPath,new Blob([buf]),{contentType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});if(upErr)throw upErr;const {error:dbErr}=await ICES_CLOUD.from('ices_templates').insert({id,name,object_path:objectPath,size_bytes:buf.byteLength,placeholder_count:phs.length});if(dbErr)throw dbErr;}else await put('templates',{id:uid(),name,data:buf,size:buf.byteLength,created:Date.now(),phs});n++}await audit('template-restore',n+' template(s)');toast(n+' template(s) restored.');await loadTpl()}catch(x){toast('Restore failed: '+x.message,7000)}e.target.value=''};
+ if(a==='del'){const used=(await all('history')).filter(h=>h.templateId===id).length;
+  if(!confirm(used?`This template is referenced by ${used} history record(s). The records stay, but you could not regenerate from this template. Delete “${t.name}” anyway?`:`Delete template “${t.name}”? Download a backup first if unsure.`))return;
+  await del('templates',id);await audit('template-delete',t.name+(used?` (referenced by ${used} history records)`:''));loadTpl();checkStorage()}};
+$('tbk').onclick=async()=>{if(!T.length)return toast('No templates to back up.');const z=new JSZip();z.file('manifest.json',JSON.stringify(T.map(t=>({file:t.id+'.docx',name:t.name,created:t.created}))));T.forEach(t=>z.file(t.id+'.docx',t.data));
+ const b=await z.generateAsync({type:'blob'});await saveFile(`ices-templates-backup-${new Date().toISOString().slice(0,10)}.zip`,b);ls('lastBackup',Date.now());$('bkinfo').textContent='Backup file created '+new Date().toLocaleString()+'. Keep it somewhere safe.'};
+$('trs').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const z=await JSZip.loadAsync(await f.arrayBuffer()),m=JSON.parse(await z.file('manifest.json').async('string'));let n=0;
+ for(const it of m){const buf=await z.file(it.file).async('arraybuffer');const zz=await JSZip.loadAsync(buf);if(!zz.file('word/document.xml'))continue;let name=it.name,v=1;while(T.some(t=>t.name===name))name=`${it.name} (restored${v>1?' '+v:''})`,v++;
+  const phs=await detectPlaceholders(buf,env);const rec={id:uid(),name,data:buf,size:buf.byteLength,created:Date.now(),phs};await put('templates',rec);T.push(rec);n++}
+ await audit('template-restore',n+' template(s)');toast(n+' template(s) restored. Existing ones were not overwritten.');loadTpl()}catch(x){toast('Restore failed: '+x.message,7000)}e.target.value=''};
 // ---- generate ----
 const S={wb:null,rows:[],cols:[],ph:[],map:{},buf:null,out:new Map(),errs:new Map(),batch:null,fname:''};
 const cfgQ=()=>ls('qrp')||DEFAULT_QR_PATTERN,cfgD=()=>ls('dfmt')||'DD-MM-YYYY',cfgM=()=>ls('mask')==='1';
