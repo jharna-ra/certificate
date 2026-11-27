@@ -2755,7 +2755,7 @@ async function saveFile(name,blob){try{const d=window.claude&&await claude.use('
 let T=[];
 async function loadTpl(){T=(await all('templates')).sort((a,b)=>b.created-a.created);const cur=$('tplSel').value;
  $('tplSel').innerHTML=T.length?T.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join(''):'<option value="">No saved templates — add one in Saved Templates</option>';if(cur)$('tplSel').value=cur;
- $('tlist').innerHTML='<tr><th>Name</th><th>Fields</th><th>Size</th><th>Saved</th><th></th></tr>'+(T.map(t=>`<tr><td>${esc(t.name)}</td><td>${t.phs.length}<div class="mut">${t.pdf?"PDF attached ✓":"No PDF (built-in design)"}</div></td><td>${mb(t.size+(t.pdf?t.pdf.byteLength:0))}</td><td>${new Date(t.created).toLocaleString()}</td><td><button class="b s" onclick="tAct('use','${t.id}')">Use</button> <button class="b s" onclick="tAct('prev','${t.id}')">Preview</button> <button class="b s" onclick="tAct('blank','${t.id}')">Blank copy</button> <button class="b s" onclick="tAct('pdf','${t.id}')">Attach PDF</button> <button class="b s" onclick="tAct('ren','${t.id}')">Rename</button> <button class="b s" onclick="tAct('dl','${t.id}')">Download</button> <button class="b d" onclick="tAct('del','${t.id}')">Delete</button></td></tr>`).join('')||'<tr><td colspan=5 class="mut">No templates saved yet.</td></tr>');
+ $('tlist').innerHTML='<tr><th>Name</th><th>Fields</th><th>Size</th><th>Saved</th><th></th></tr>'+(T.map(t=>`<tr><td>${esc(t.name)}</td><td>${t.phs.length}<div class="mut">${t.pdf?"PDF attached ✓":"No PDF (built-in design)"}</div></td><td>${mb(t.size+(t.pdf?t.pdf.byteLength:0))}</td><td>${new Date(t.created).toLocaleString()}</td><td><button class="b s" onclick="tAct('use','${t.id}')">Use</button> <button class="b s" onclick="tAct('prev','${t.id}')">Preview</button> <button class="b s" onclick="tAct('blank','${t.id}')">Blank copy</button> <button class="b s" onclick="tAct('pdf','${t.id}')">Attach PDF</button> ${t.pdf?`<button class="b s" onclick="tAct('ppv','${t.id}')">Preview PDF</button>`:''} <button class="b s" onclick="tAct('ren','${t.id}')">Rename</button> <button class="b s" onclick="tAct('dl','${t.id}')">Download</button> <button class="b d" onclick="tAct('del','${t.id}')">Delete</button></td></tr>`).join('')||'<tr><td colspan=5 class="mut">No templates saved yet.</td></tr>');
  $('bkinfo').textContent=ls('lastBackup')?'Last backup file created: '+new Date(+ls('lastBackup')).toLocaleString():'No backup created yet.';await onTpl()}
 $('tfile').onchange=e=>{const f=e.target.files[0];if(f&&!$('tname').value.trim())$('tname').value=f.name.replace(/\.docx$/i,'').replace(/[_-]+/g,' ').trim()};
 $('tsave').onclick=async()=>{const f=$('tfile').files[0];let name=$('tname').value.trim();if(!f)return toast('Choose a Word (.docx) file first.',6000);if(!name)return toast('Type a name for this template.',6000);
@@ -2773,6 +2773,10 @@ window.tAct=async(a,id)=>{const t=T.find(x=>x.id===id);if(!t)return;
  if(a==='dl')saveFile(t.name+'.docx',new Blob([t.data]));
  if(a==='blank'){try{saveFile(t.name+' BLANK (Save as PDF).docx',new Blob([await blankDocx(t)]));toast('Open this blank copy in Word, choose File > Save As > PDF, then press Attach PDF for this template.',12000)}catch(e){toast('Could not make the blank copy: '+e.message,8000)}}
  if(a==='pdf'){const inp=document.createElement('input');inp.type='file';inp.accept='.pdf,application/pdf';inp.onchange=async()=>{const f=inp.files[0];if(!f)return;const b=await f.arrayBuffer();if(new TextDecoder().decode(b.slice(0,5))!=='%PDF-')return toast('That is not a PDF file.',6000);t.pdf=b;await put('templates',t).catch(fail);PT.c=null;await loadTpl();if(await checkPdf(t))toast('PDF attached and checked. PDFs for this template now follow the Word design.',8000);await cloudSave(t.id)};inp.click()}
+ if(a==='ppv'){try{const pt=await pdfTplFor(id);if(!pt)return toast('No PDF attached to this template.');const im=document.createElement('canvas');im.width=1100;im.height=Math.round(1100*pt.bg.height/pt.bg.width);im.getContext('2d').drawImage(pt.bg,0,0,im.width,im.height);
+  const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:10px;overflow:auto;cursor:pointer';
+  const m=document.createElement('div');m.style.cssText='color:#fff;font:14px system-ui;max-width:900px;text-align:center';m.textContent='This is the background your PDFs will use (the values are added on top). It must look clean and complete, like your blank Word template. If it looks scrambled, do not generate PDFs. Click anywhere to close.';
+  im.style.cssText='max-width:96vw;max-height:78vh;background:#fff';ov.append(m,im);ov.onclick=()=>ov.remove();document.body.appendChild(ov)}catch(e){toast('Preview failed: '+(e.message||e),9000)}}
  if(a==='prev'){document.querySelector('[data-t=gen]').click();$('pdoc').style.display='block';$('prevCard').style.display='block';renderDoc(t.data)}
  if(a==='ren'){const n=(prompt('New name',t.name)||'').trim();if(n&&n!==t.name){if(T.some(x=>x.name===n))return toast('That name already exists.');t.name=n;await put('templates',t).catch(fail);await audit('template-rename',n);await loadTpl();await cloudSave(t.id)}}
  if(a==='del'){const used=(await all('history')).filter(h=>h.templateId===id).length;
@@ -2786,7 +2790,7 @@ $('trs').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const z=a
  await audit('template-restore',n+' template(s)');toast(n+' template(s) restored. Existing ones were not overwritten.');await loadTpl();if(TC.on())TC.sync(true)}catch(x){toast('Restore failed: '+x.message,7000)}e.target.value=''};
 // ---- generate ----
 /** Fields printed on the built-in PDF layout. Used when no Word template is chosen (PDF only needs the Excel file). */
-const GEN_VERSION='v7 (2026-11-27, cloud templates, template alignment)';
+const GEN_VERSION='v8 (2026-11-27, PDF preview)';
 const PDF_PH=['Name','AadharNo','FatherName','DOB','EnrollmentNo','JobRole','Duration','TrainingCenter','District','State','AssessmentPartner','Grade','IssuePlace','IssueDate','CertificateNo'];
 const S={wb:null,rows:[],cols:[],ph:[],map:{},buf:null,out:new Map(),errs:new Map(),batch:null,fname:''};
 const cfgQ=()=>ls('qrp')||DEFAULT_QR_PATTERN,cfgD=()=>ls('dfmt')||'DD-MM-YYYY',cfgM=()=>ls('mask')==='1';
@@ -2920,11 +2924,11 @@ async function loadPdfJs(){if(_pdfjs)return _pdfjs;
  if(!window.pdfjsLib)await load(base+'pdf.min.js');
  if(!(window.pdfjsWorker&&window.pdfjsWorker.WorkerMessageHandler))await load(base+'pdf.worker.min.js');
  pdfjsLib.GlobalWorkerOptions.workerSrc=base+'pdf.worker.min.js';return _pdfjs=pdfjsLib}
-async function pdfBackground(buf,pw){const lib=await loadPdfJs(),doc=await lib.getDocument({data:new Uint8Array(buf.slice(0))}).promise,pg=await doc.getPage(1);
+async function pdfBackground(buf,pw){const lib=await loadPdfJs(),doc=await lib.getDocument({data:new Uint8Array(buf.slice(0)),isOffscreenCanvasSupported:false,useSystemFonts:false,isEvalSupported:false}).promise,pg=await doc.getPage(1);
  const tc=await pg.getTextContent(),ptxt=tc.items.map(i=>i.str).join(' '),bad=ptxt.match(/«[^»]{1,40}»|\{\{?\s*[A-Za-z_][A-Za-z0-9_ ]{0,40}\}?\}/);
  if(bad)throw Error('This PDF still shows placeholder text ('+bad[0].trim()+'). It must be saved from the BLANK COPY of the template (Saved templates > Blank copy > open in Word > Save As PDF), not from the original template or a filled certificate.');
  const v0=pg.getViewport({scale:1}),sc=Math.round(pw*CERT.DPI/72)/v0.width,vp=pg.getViewport({scale:sc}),c=document.createElement('canvas');
- c.width=Math.round(vp.width);c.height=Math.round(vp.height);const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);await pg.render({canvasContext:g,viewport:vp}).promise;return c}
+ c.width=Math.round(vp.width);c.height=Math.round(vp.height);const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);await pg.render({canvasContext:g,viewport:vp,intent:'print'}).promise;return c}
 const A=(e,n)=>e&&e.getAttribute(n);
 const inFallback=n=>{for(;n;n=n.parentNode)if(n.nodeName==='mc:Fallback')return true;return false};
 function placeAxis(p,size,lo,hi,pageSize,paraBase){ // p = wp:positionH / wp:positionV element
