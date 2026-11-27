@@ -1,10 +1,9 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><title>ICES Bulk Certificate Generator</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🎓%3C/text%3E%3C/svg%3E">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
 <style>
 :root{--bg:#f4f6fb;--card:#fff;--ink:#14213d;--mut:#5b6b8c;--line:#dde3f0;--pri:#16357a;--pri2:#e8eefc;--ok:#157347;--warn:#b45309;--bad:#b42318;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -30,44 +29,42 @@ button.b{background:var(--pri);color:var(--bg);border:0;padding:9px 16px;border-
 #pdoc{max-height:520px;overflow:auto;border:1px solid var(--line);border-radius:8px;background:#fff;margin-top:12px}.mut{color:var(--mut);font-size:13px}
 </style></head><body>
 <header><div class="logo">ICES</div><div class="brand"><b>Integrated Council for Entrepreneurship and Skilling</b><small>Erstwhile The Institution of Civil Engineers Society · An Awarding Body Recognised by NCVET</small></div>
-<nav id="nav"><button data-t="gen" class="on">Generate Certificate</button><button data-t="tpl">Saved Templates</button><button data-t="onl">Online Records</button><button data-t="his">History</button><button data-t="set">QR &amp; Settings</button></nav></header>
+<nav id="nav"><button data-t="gen" class="on">Generate Certificate</button><button data-t="tpl">Saved Templates</button><button data-t="his">History</button><button data-t="set">QR &amp; Settings</button></nav></header>
 <div id="banner"></div>
 <main>
 <section id="gen" class="on">
-<div class="card"><h2><span class="step">1</span>Template &amp; candidate list</h2><p class="h">Pick a saved Word template, then upload the Excel file. Nothing leaves your browser.</p>
+<div class="card"><h2><span class="step">1</span>Template &amp; candidate list</h2><p class="h">Pick a shared Word template available to all ICES users, then upload your Excel file. Candidate data stays in your browser.</p>
 <div class="row"><div><label>Saved template</label><select id="tplSel"></select><div class="acts" style="margin-top:6px"><button class="b s" id="addT" type="button">+ Add a new template</button></div></div><div><label>Excel file (.xlsx / .xls)</label><input type="file" id="xls" accept=".xlsx,.xls"></div><div id="shtBox"><label>Worksheet (tab in your Excel file)</label><select id="sht"></select><div class="mut" id="shtHelp"></div></div></div><div id="tplInfo" class="mut" style="margin-top:8px"></div></div>
 <div class="card" id="mapCard"><h2><span class="step">2</span>Field mapping</h2><p class="h">Placeholders found in the template are matched to your Excel columns automatically. Change any with the dropdowns.</p><div id="map" class="row"></div><div id="issues" style="margin-top:12px"></div></div>
 <div class="card" id="prevCard"><h2><span class="step">3</span>Preview</h2><div class="row"><div><label>Candidate <span id="cnt" class="pill"></span></label><select id="cand"></select></div></div>
 <div class="prev" style="margin-top:12px"><div class="tbl"><table id="pvals"></table></div><div><canvas id="qr" style="width:190px;height:190px;border:1px solid var(--line);border-radius:8px;background:#fff"></canvas><div class="mut">QR for this candidate</div></div></div><div id="qinfo" style="margin-top:10px"></div><div class="mut" style="margin-top:8px">A phone camera or Google Lens will show this text:</div><pre id="qtext" style="white-space:pre-wrap;word-break:break-all;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;font-size:12px;margin:4px 0 0"></pre>
 <div class="acts"><button class="b s" id="pbtn">Render certificate preview</button></div><div id="pdoc" style="display:none"></div><p class="mut">The preview is an approximation. Check final layout in Word.</p></div>
-<div class="card" id="genCard"><h2><span class="step">4</span>Generate</h2><p class="h">Word: one editable .docx per candidate in a ZIP. PDF: one ready PDF per candidate, made right in your browser with nothing to install, plus the editable Word files in a Word folder. QR codes contain candidate personal data.</p>
-<div class="acts"><button class="b" id="gbtn" disabled>Generate Word certificates (.docx)</button><button class="b" id="gpdf" disabled>Generate PDF certificates (from your Word template)</button><button class="b s" id="rbtn" style="display:none">Retry failed</button><button class="b s" id="dbtn" style="display:none">Download ZIP</button><button class="b" id="dpdf2" style="display:none">Download ONE combined PDF (laid out exactly like your Word template)</button></div>
+<div class="card" id="genCard"><h2><span class="step">4</span>Generate</h2><p class="h">Word: one editable .docx per candidate in a ZIP. PDF: downloads a ZIP containing the same generated Word certificates plus a one-click PDF converter. On Windows, double-click Convert-to-PDF.bat after extracting the ZIP. It uses Microsoft Word PDF export when installed (best layout match); otherwise it tries LibreOffice. The converted PDF files are saved in a PDF folder. This conversion step runs on your computer, not inside the browser. QR codes contain candidate personal data.</p>
+<div class="acts"><button class="b" id="gbtn" disabled>Generate Word certificates (.docx)</button><button class="b" id="gpdf" disabled>Prepare PDF download (Word + converter)</button><button class="b s" id="rbtn" style="display:none">Retry failed</button><button class="b s" id="dbtn" style="display:none">Download ZIP</button></div>
 <div id="ready" class="mut" style="margin-top:8px"></div><div class="bar" style="margin-top:14px"><i id="pbar"></i></div><div id="gstat" class="mut" style="margin-top:6px"></div><div id="gerr" class="tbl"></div></div>
 </section>
-<section id="tpl"><div class="card"><h2>Upload a Word template</h2><p class="h">Saved on this computer and browser only (IndexedDB). A template with an existing name is saved as a new version and never overwrites the old one.</p>
+<section id="tpl"><div class="card"><h2>Upload a Word template</h2><p class="h">Templates are uploaded to the shared ICES cloud library and become visible to all users. Older versions are retained.</p>
 <div class="row"><div><label>Template name</label><input id="tname" placeholder="e.g. ICES RPL Certificate"></div><div><label>Word file (.docx)</label><input type="file" id="tfile" accept=".docx"></div></div><div class="acts"><button class="b" id="tsave">Save template</button></div></div>
-<div class="card"><h2>Saved templates</h2><div class="tbl"><table id="tlist"></table></div><div class="acts"><button class="b s" id="tbk">Backup all templates</button><label class="b s" style="margin:0;cursor:pointer;display:inline-block">Restore from backup<input type="file" id="trs" accept=".zip" style="display:none"></label></div><div id="bkinfo" class="mut" style="margin-top:8px"></div></div></section>
-<section id="onl"><div class="card"><h2>Online records</h2><p class="h">Every certificate generated with online verification is saved here as a small record. Search any old certificate and download it again as a PDF whenever needed. Nothing here uses your browser storage.</p>
-<div class="row"><div><label>Search name or certificate number</label><input id="osq" placeholder="type and press Search"></div><div style="flex:0 0 auto;align-self:flex-end"><button class="b" id="osgo">Search</button></div></div>
-<div id="osum" class="mut" style="margin:10px 0 0"></div>
-<div class="acts"><button class="b s" id="opdf">Download ALL online records as ONE combined PDF</button><button class="b s" id="orev">Revoke selected</button><button class="b s" id="ores">Restore selected</button><button class="b s" id="odel">Remove from list (QR keeps working)</button><button class="b d" id="odelp">Delete permanently…</button> <button class="b s" id="oselall">Select ALL records (every page)</button> <button class="b s" id="oclr">Clear selection</button> <span id="ocnt" class="mut"></span><button class="b s" id="oold">Remove oldest from list…</button><button class="b s" id="oexp">Export backup (JSON)</button><label class="b s" style="margin:0;cursor:pointer">Restore backup<input type="file" id="oimpf" accept=".json" hidden></label></div>
-<div class="tbl" style="margin-top:10px"><table id="otab"></table></div>
-<div class="acts"><button class="b s" id="oprev">‹ Previous</button><span id="opg" class="mut" style="align-self:center"></span><button class="b s" id="onext">Next ›</button></div><div id="ostat" class="mut" style="margin-top:8px"></div></div></section>
-<section id="his"><div class="card"><h2>Generation history</h2><p class="h">Records only. Generated files are never stored. Kept until you delete them, except oldest-first cleanup at 85% storage.</p><div class="tbl"><table id="hlist"></table></div><div class="acts"><button class="b s" id="hexcel">Export ALL candidate details to Excel</button><button class="b s" id="hpdf">Download ALL candidate certificates as ONE PDF</button><button class="b d" id="hdel">Delete selected</button></div><div id="hexportstat" class="mut" style="margin-top:8px">Bulk exports use all online certificate records in Supabase. Sign in under QR &amp; Settings first.</div></div>
-<div class="card" style="display:none"><h2>Audit log</h2><div class="tbl"><table id="alist"></table></div></div></section>
-<section id="set"><div class="card"><h2>Online verification (QR opens your verification website)</h2><p class="h">When this is filled in and you are signed in, the QR code holds only a short link such as <b>https://verify.iceskills.in/c/AB12CD34EF</b>. Anyone who scans it sees every detail of that certificate on your verification site. Only the details are saved in your Supabase database (no files), so storage stays tiny.</p>
-<div class="row"><div><label>Verification site address</label><input id="vsite" placeholder="https://verify.iceskills.in" autocomplete="off"></div><div><label>Supabase project URL</label><input id="sbu" placeholder="https://xxxxxxxx.supabase.co" autocomplete="off"></div></div>
-<div class="row" style="margin-top:10px"><div><label>Supabase anon (public) key</label><input id="sbk" autocomplete="off"></div><div><label>Admin e-mail</label><input id="sbe" type="email" autocomplete="username"></div></div>
-<div class="row" style="margin-top:10px"><div><label>Admin password (not saved)</label><input id="sbp" type="password" autocomplete="current-password"></div><div><label>Online verification</label><select id="vron"><option value="1">On (short QR link)</option><option value="0">Off (old long QR text)</option></select></div></div>
-<div class="acts"><button class="b" id="vsave">Save &amp; sign in</button><button class="b s" id="vout">Sign out</button><button class="b s" id="vtest">Test connection</button></div><div id="vstat" class="mut" style="margin-top:8px"></div></div>
-<div class="card"><h2>QR code data pattern (used only when online verification is Off)</h2><p class="h">Tokens like {Name} are filled from each candidate. Warning: the QR code contains the candidate’s personal information in plain text. It is not an online verification system.</p><textarea id="qrp"></textarea>
-<label>Error correction</label><select id="qecc"><option value="L">L – lowest density, easiest to scan (7% repair)</option><option value="M">M – balanced (15% repair, default)</option><option value="Q">Q – most repair, densest (25%)</option></select><div class="acts"><button class="b" id="qsave">Save pattern</button><button class="b s" id="qreset">Reset to default</button><button class="b s" id="qcomp">Use compact pattern (easier to scan)</button> <button class="b" id="qlife">Lifetime QR: no website needed (recommended)</button></div></div>
+<div class="card"><h2>Shared &amp; saved templates</h2><p class="h">Cloud templates are shared across users. Locally saved templates remain visible only in this browser. Cloud templates can be downloaded but not renamed or deleted from this page.</p><div class="tbl"><table id="tlist"></table></div><div class="acts"><button class="b s" id="tbk">Backup all templates</button><label class="b s" style="margin:0;cursor:pointer;display:inline-block">Restore from backup<input type="file" id="trs" accept=".zip" style="display:none"></label></div><div id="bkinfo" class="mut" style="margin-top:8px"></div></div></section>
+<section id="his"><div class="card"><h2>Generation history</h2><p class="h">Records only. Generated files are never stored. Kept until you delete them, except oldest-first cleanup at 85% storage.</p><div class="tbl"><table id="hlist"></table></div><div class="acts"><button class="b d" id="hdel">Delete selected</button></div></div>
+<div class="card"><h2>Audit log</h2><div class="tbl"><table id="alist"></table></div></div></section>
+<section id="set"><div class="card"><h2>QR code data pattern</h2><p class="h">Tokens like {Name} are filled from each candidate. Warning: the QR code contains the candidate’s personal information in plain text. It is not an online verification system.</p><textarea id="qrp"></textarea>
+<label>Error correction</label><select id="qecc"><option value="L">L – lowest density, easiest to scan (7% repair)</option><option value="M">M – balanced (15% repair, default)</option><option value="Q">Q – most repair, densest (25%)</option></select><div class="acts"><button class="b" id="qsave">Save pattern</button><button class="b s" id="qreset">Reset to default</button><button class="b s" id="qcomp">Use compact pattern (easier to scan)</button></div></div>
 <div class="card"><h2>QR position on certificate</h2><p class="h">Adjust if the QR touches text. Smaller QR codes are harder to scan, so use the compact pattern if you shrink it.</p><div class="row"><div><label>QR size (inches)</label><input id="qsz" type="number" step="0.05" min="0.7" max="1.3"></div><div><label>Move QR down (inches)</label><input id="qdn" type="number" step="0.05" min="-0.3" max="0.4"></div></div></div>
 <div class="card"><h2>Settings</h2><div class="row"><div><label>Date format</label><select id="dfmt"><option>DD-MM-YYYY</option><option>DD/MM/YYYY</option><option>YYYY-MM-DD</option><option>DD/MMM/YYYY</option></select></div><div><label>Aadhaar in certificate and QR</label><select id="mask"><option value="0">Print as in Excel (default)</option><option value="1">Mask all but last 4 digits</option></select></div></div></div>
 <div class="card"><h2>Browser storage</h2><div class="bar"><i id="sbar"></i></div><div id="sinfo" class="mut" style="margin-top:6px"></div><p class="mut">Data stays on this browser. Clearing browser data or switching computers removes it, so keep backups. Free hosting limits can change, and no uptime is promised.</p></div></section>
 </main><div id="toast"></div>
 <script>
 const JSZip=window.JSZip;
+// ---- SHARED ICES TEMPLATE LIBRARY CONFIGURATION ----
+// Create a Supabase project, run the SQL in supabase-template-library.sql,
+// then paste your Project URL and anon/public key below. Never use service_role here.
+const ICES_SUPABASE_URL = 'PASTE_YOUR_SUPABASE_PROJECT_URL_HERE';
+const ICES_SUPABASE_ANON_KEY = 'PASTE_YOUR_SUPABASE_ANON_KEY_HERE';
+const ICES_TEMPLATE_BUCKET = 'ices-templates';
+const cloudReady = !!(window.supabase && ICES_SUPABASE_URL.startsWith('https://') && !ICES_SUPABASE_URL.includes('PASTE_') && ICES_SUPABASE_ANON_KEY && !ICES_SUPABASE_ANON_KEY.includes('PASTE_'));
+const cloud = cloudReady ? window.supabase.createClient(ICES_SUPABASE_URL, ICES_SUPABASE_ANON_KEY) : null;
+
 //---------------------------------------------------------------------
 //
 // QR Code Generator for JavaScript
@@ -2394,53 +2391,6 @@ function eachParagraph(doc, fn) {
 }
 
 /** Pass 1: genuine MERGEFIELD complex fields. Returns found names. */
-/* ---- Alignment, indents and box margins are never changed: they stay exactly as designed in the Word template. Only a value that is wider than its box gets a smaller font. ---- */
-const TOUCH = new Set();
-const ENROLL_NAMES = new Set(['enrollmentno', 'enrollmentnumber', 'enrolmentno', 'enrolmentnumber']); // the enrollment number is always printed at 12 pt
-let DEFPT = 11, _defBuf = null;
-const EM_AFTER_SZ = ['w:highlight', 'w:u', 'w:effect', 'w:bdr', 'w:shd', 'w:fitText', 'w:vertAlign', 'w:rtl', 'w:cs', 'w:em', 'w:lang', 'w:eastAsianLayout', 'w:specVanish', 'w:oMath'];
-// Arial-compatible character widths (per 1000 em) for ASCII 32-126; other characters (for example Hindi) use 0.6 em.
-const W_REG = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584], W_BOLD = [278,333,474,556,556,889,722,238,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,333,333,584,584,584,611,975,722,722,722,722,667,611,778,722,278,556,722,611,833,722,778,667,778,722,667,611,722,667,944,667,667,611,333,278,333,584,556,333,556,611,556,611,556,333,611,611,278,278,556,278,889,611,611,611,611,389,556,333,611,556,778,556,556,500,389,280,389,584];
-const estWidth = (txt, bold) => Array.from(txt).reduce((a, c) => { const k = c.charCodeAt(0) - 32; return a + (k >= 0 && k < 95 ? (bold ? W_BOLD : W_REG)[k] / 1000 : 0.6); }, 0);
-function setSz(doc, run, halfPts) {
-  let rPr = kids(run, 'w:rPr')[0];
-  if (!rPr) { rPr = doc.createElementNS(NS.w, 'w:rPr'); run.insertBefore(rPr, run.firstChild); }
-  for (const tag of ['w:sz', 'w:szCs']) {
-    let el = kids(rPr, tag)[0];
-    if (!el) {
-      el = doc.createElementNS(NS.w, tag);
-      const stop = tag === 'w:sz' ? ['w:szCs', ...EM_AFTER_SZ] : EM_AFTER_SZ;
-      const before = Array.from(rPr.childNodes).find((n) => stop.includes(n.nodeName));
-      before ? rPr.insertBefore(el, before) : rPr.appendChild(el);
-    }
-    el.setAttribute('w:val', String(halfPts));
-  }
-}
-/** Only when a value is wider than its text box: reduce its font so it still fits. Never touches alignment, indents, margins or wrapping. */
-function fitTouched(doc) {
-  for (const p of Array.from(TOUCH)) {
-    if (p.ownerDocument !== doc) continue;
-    TOUCH.delete(p);
-    if (p.getElementsByTagName('w:drawing')[0]) continue;
-    let box = null;
-    for (let n = p; n; n = n.parentNode) if (n.nodeName === 'w:txbxContent') { box = n; break; }
-    if (!box) continue;
-    const tb = box.parentNode; if (tb.nodeName !== 'wps:txbx') continue;
-    const wsp = tb.parentNode, bp = wsp.getElementsByTagName('wps:bodyPr')[0];
-    let cx = 0;
-    for (let n = wsp; n; n = n.parentNode) if (n.nodeName === 'wp:anchor' || n.nodeName === 'wp:inline') { const e = n.getElementsByTagName('wp:extent')[0]; if (e) cx = Number(e.getAttribute('cx')); break; }
-    if (!cx) continue;
-    const inset = (a) => (bp && bp.hasAttribute(a) ? Number(bp.getAttribute(a)) : 91440);
-    const runs = kids(p, 'w:r').filter((r) => kids(r, 'w:t').length);
-    const text = runs.map((r) => kids(r, 'w:t').map((t) => t.textContent).join('')).join('');
-    if (!text.trim()) continue;
-    const avail = (cx - inset('lIns') - inset('rIns')) / 12700 * 0.96;
-    const rp = kids(runs[0], 'w:rPr')[0], szEl = rp && kids(rp, 'w:sz')[0], bEl = rp && kids(rp, 'w:b')[0];
-    const base = szEl ? Number(szEl.getAttribute('w:val')) / 2 : DEFPT;
-    const need = estWidth(text, bEl && !['0', 'false'].includes(bEl.getAttribute('w:val'))) * base;
-    if (need > avail) { const ns = Math.max(base * 0.55, Math.floor(base * avail / need * 2) / 2); runs.forEach((r) => setSz(doc, r, Math.round(ns * 2))); }
-  }
-}
 function processFields(doc, resolve, found) {
   // Simple fields: <w:fldSimple w:instr=" MERGEFIELD Name ">
   const simples = Array.from(doc.getElementsByTagName('w:fldSimple'));
@@ -2528,11 +2478,7 @@ function shiftBox(el) {
 function replaceNodes(doc, nodes, model, name, val) {
   const anchor = nodes[0];
   const run = val === '[qr]' ? qrRun(doc, model) : textRun(doc, model, String(val ?? ''));
-  // Enrollment number must use 12 pt instead of inheriting the Word template's font size.
-  // Word stores font sizes in half-points, so 24 = 12 pt.
-  if (val !== '[qr]' && ENROLL_NAMES.has(canon(name))) setSz(doc, run, 24);
   anchor.parentNode.insertBefore(run, anchor);
-  if (val !== '[qr]') TOUCH.add(anchor.parentNode);
   if (val === '[qr]') { trimLeadingBreaks(anchor.parentNode); zeroInsets(anchor.parentNode); shiftBox(anchor.parentNode); }
   nodes.forEach((n) => n.parentNode && n.parentNode.removeChild(n));
 }
@@ -2579,20 +2525,9 @@ function processPlain(doc, resolve, found) {
         trimLeadingBreaks(qr.parentNode); zeroInsets(qr.parentNode); shiftBox(qr.parentNode);
         if (post) qr.parentNode.insertBefore(textRun(doc, runs[si], post), qr.nextSibling);
       } else {
-        const isEnr = ENROLL_NAMES.has(canon(ed.name));
-        if (isEnr && si === ei && (pre.trim() || post.trim())) {
-          // the number shares a run with other text: give only the number its own 12 pt run
-          ts[si].textContent = pre; ts[si].setAttribute('xml:space', 'preserve');
-          const vr = textRun(doc, runs[si], String(ed.val ?? '')); setSz(doc, vr, 24);
-          runs[si].parentNode.insertBefore(vr, runs[si].nextSibling);
-          if (post) runs[si].parentNode.insertBefore(textRun(doc, runs[si], post), vr.nextSibling);
-        } else {
-          ts[si].textContent = pre + String(ed.val ?? '') + (si === ei ? post : '');
-          ts[si].setAttribute('xml:space', 'preserve');
-          if (si !== ei) ts[ei].textContent = post;
-          if (isEnr) setSz(doc, runs[si], 24);
-        }
-        TOUCH.add(runs[si].parentNode);
+        ts[si].textContent = pre + String(ed.val ?? '') + (si === ei ? post : '');
+        ts[si].setAttribute('xml:space', 'preserve');
+        if (si !== ei) ts[ei].textContent = post;
       }
     }
   });
@@ -2620,7 +2555,6 @@ async function detectPlaceholders(buf, env) {
 async function mergeDocx(buf, values, qrPng, env, opts = {}) {
   QR_EMU = Math.round((opts.qrIn || 1.05) * 914400); QR_DOWN = Math.round((opts.downIn ?? 0.1) * 914400);
   const zip = await JSZip.loadAsync(buf);
-  if (_defBuf !== buf) { _defBuf = buf; DEFPT = 11; const st = zip.file('word/styles.xml'); if (st) { const m = /<w:docDefaults>[\s\S]*?<w:sz w:val="(\d+)"/.exec(await st.async('string')); if (m) DEFPT = Number(m[1]) / 2; } }
   const map = new Map(Object.entries(values).map(([k, v]) => [k.toLowerCase(), v]));
   let usesQr = false;
   const found = new Set();
@@ -2632,7 +2566,6 @@ async function mergeDocx(buf, values, qrPng, env, opts = {}) {
     };
     processFields(doc, resolve, found);
     processPlain(doc, resolve, found);
-    fitTouched(doc);
     zip.file(name, new env.XMLSerializer().serializeToString(doc));
   }
   if (usesQr && qrPng) {
@@ -2689,10 +2622,8 @@ function rowValues(row, mapping, dateFmt) {
 }
 /** QR text from the editable pattern; tokens resolve via canonical names so they work with any column naming. */
 function qrText(pattern, values) {
-  const byCanon = new Map(Object.entries(values || {}).filter(([k]) => k !== '__vurl').map(([k, v]) => [canon(k), v]));
-  const details = pattern.replace(/\{\s*([^}]+?)\s*\}/g, (_, t) => byCanon.get(canon(t)) ?? '');
-  const link = values && values.__vurl ? String(values.__vurl).trim() : '';
-  return link ? details + '\nVerification link: ' + link : details;
+  const byCanon = new Map(Object.entries(values).map(([k, v]) => [canon(k), v]));
+  return pattern.replace(/\{\s*([^}]+?)\s*\}/g, (_, t) => byCanon.get(canon(t)) ?? '');
 }
 function maskAadhaar(v) { const d = String(v); return d.length > 4 ? 'X'.repeat(d.length - 4) + d.slice(-4) : d; }
 
@@ -2720,7 +2651,7 @@ const tx=async(s,m,f)=>{const d=await open();return new Promise((res,rej)=>{cons
 const all=s=>tx(s,'readonly',o=>o.getAll()),put=(s,v)=>tx(s,'readwrite',o=>o.put(v)),del=(s,id)=>tx(s,'readwrite',o=>o.delete(id));
 const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2);
 const fail=e=>toast(e&&e.name==='QuotaExceededError'?'Storage is full. Delete history or templates, or back up first.':'Storage error: '+(e&&e.message||e),7000);
-const audit=()=>{}; // audit log removed: nothing is written
+const audit=(action,detail)=>put('audit',{id:uid(),at:Date.now(),action,detail}).catch(()=>{});
 // ---- storage monitor ----
 async function storage(){try{const e=await navigator.storage.estimate();return{used:e.usage||0,quota:e.quota||1,pct:(e.usage||0)/(e.quota||1)*100}}catch(e){return null}}
 const mb=b=>(b/1048576).toFixed(1)+' MB';
@@ -2738,31 +2669,60 @@ async function saveFile(name,blob){try{const d=window.claude&&await claude.use('
  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
 // ---- templates ----
 let T=[];
-async function loadTpl(){T=(await all('templates')).sort((a,b)=>b.created-a.created);const cur=$('tplSel').value;
- $('tplSel').innerHTML=T.length?T.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join(''):'<option value="">No saved templates — add one in Saved Templates</option>';if(cur)$('tplSel').value=cur;
- $('tlist').innerHTML='<tr><th>Name</th><th>Fields</th><th>Size</th><th>PDF layout</th><th>Saved</th><th></th></tr>'+(T.map(t=>`<tr><td>${esc(t.name)}</td><td>${t.phs.length}</td><td>${mb(t.size)}</td><td>${t.marks?'<span class="ok">Ready</span>':'<span class="warn">Not set</span>'}</td><td>${new Date(t.created).toLocaleString()}</td><td><button class="b s" onclick="tAct('use','${t.id}')">Use</button> <button class="b s" onclick="tAct('prev','${t.id}')">Preview</button> <button class="b s" onclick="tAct('ren','${t.id}')">Rename</button> <button class="b s" onclick="pdfSetup('${t.id}')">PDF layout</button> <button class="b s" onclick="tAct('dl','${t.id}')">Download</button> <button class="b d" onclick="tAct('del','${t.id}')">Delete</button></td></tr>`).join('')||'<tr><td colspan=6 class="mut">No templates saved yet.</td></tr>');
- $('bkinfo').textContent=ls('lastBackup')?'Last backup file created: '+new Date(+ls('lastBackup')).toLocaleString():'No backup created yet.';await onTpl()}
+async function loadTpl(){
+ const local=await all('templates');
+ let shared=[];
+ if(cloud){
+  try{
+   const {data:rows,error}=await cloud.from('ices_templates').select('*').order('created_at',{ascending:false});
+   if(error)throw error;
+   shared=await Promise.all((rows||[]).map(async r=>{
+    const {data:blob,error:de}=await cloud.storage.from(ICES_TEMPLATE_BUCKET).download(r.object_path);
+    if(de)throw de;
+    const buf=await blob.arrayBuffer();
+    let phs=[];try{phs=await detectPlaceholders(buf,env)}catch(e){}
+    return {id:'cloud:'+r.id,cloudId:r.id,cloud:true,name:r.name,data:buf,size:r.size_bytes||buf.byteLength,created:new Date(r.created_at).getTime(),phs};
+   }));
+  }catch(e){toast('Could not load shared templates: '+(e.message||e),7000)}
+ }
+ T=[...shared,...local].sort((a,b)=>b.created-a.created);
+ const cur=$('tplSel').value;
+ $('tplSel').innerHTML=T.length?T.map(t=>`<option value="${t.id}">${esc(t.name)}${t.cloud?' · SHARED':' · THIS BROWSER'}</option>`).join(''):'<option value="">No templates available — upload one in Saved Templates</option>';
+ if(cur&&T.some(t=>t.id===cur))$('tplSel').value=cur;
+ $('tlist').innerHTML='<tr><th>Name</th><th>Scope</th><th>Fields</th><th>Size</th><th>Saved</th><th>Actions</th></tr>'+(T.map(t=>`<tr><td>${esc(t.name)}</td><td>${t.cloud?'<span class="pill">Shared globally</span>':'This browser'}</td><td>${t.phs.length}</td><td>${mb(t.size)}</td><td>${new Date(t.created).toLocaleString()}</td><td><button class="b s" onclick="tAct('use','${t.id}')">Use</button> <button class="b s" onclick="tAct('prev','${t.id}')">Preview</button> <button class="b s" onclick="tAct('dl','${t.id}')">Download</button>${t.cloud?'':' <button class="b s" onclick="tAct(\'ren\',\''+t.id+'\')">Rename</button> <button class="b d" onclick="tAct(\'del\',\''+t.id+'\')">Delete</button>'}</td></tr>`).join('')||'<tr><td colspan=6 class="mut">No templates saved yet.</td></tr>');
+ $('bkinfo').textContent=(cloud?'Shared cloud library connected. ':'Cloud not configured — local-only mode. ')+(ls('lastBackup')?'Last backup: '+new Date(+ls('lastBackup')).toLocaleString():'No local backup created yet.');
+ await onTpl();
+}
 $('tfile').onchange=e=>{const f=e.target.files[0];if(f&&!$('tname').value.trim())$('tname').value=f.name.replace(/\.docx$/i,'').replace(/[_-]+/g,' ').trim()};
 $('tsave').onclick=async()=>{const f=$('tfile').files[0];let name=$('tname').value.trim();if(!f)return toast('Choose a Word (.docx) file first.',6000);if(!name)return toast('Type a name for this template.',6000);
- try{if(f.size>25*1048576)throw Error('File is larger than 25 MB');const buf=await f.arrayBuffer();const z=await JSZip.loadAsync(buf);if(!z.file('word/document.xml')||!z.file('[Content_Types].xml'))throw Error('Not a valid Word .docx file');
+ try{
+  if(f.size>25*1048576)throw Error('File is larger than 25 MB');
+  const buf=await f.arrayBuffer();const z=await JSZip.loadAsync(buf);if(!z.file('word/document.xml')||!z.file('[Content_Types].xml'))throw Error('Not a valid Word .docx file');
   const phs=await detectPlaceholders(buf,env);if(!phs.length)throw Error('No placeholders like «Name» or {Name} were found in this template');
-  const base=name;let v=1;while(T.some(t=>t.name===name))name=`${base} (v${++v})`;if(v>1)toast(`Name already used, saved as “${name}”. The old template is untouched.`);
-  const s=await checkStorage();if(s&&s.pct>=95)throw Error('Storage is at 95% or more. Free up space first.');
-  await put('templates',{id:uid(),name,data:buf,size:buf.byteLength,created:Date.now(),phs});await audit('template-add',name);$('tname').value='';$('tfile').value='';await loadTpl();checkStorage();toast('Template saved.')}catch(e){e.name==='QuotaExceededError'?fail(e):toast('Not saved: '+e.message,7000)}};
+  if(cloud){
+   const id=crypto.randomUUID();const objectPath=id+'.docx';
+   const {error:upErr}=await cloud.storage.from(ICES_TEMPLATE_BUCKET).upload(objectPath,new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}),{contentType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',upsert:false});
+   if(upErr)throw upErr;
+   const {error:dbErr}=await cloud.from('ices_templates').insert({id,name,object_path:objectPath,size_bytes:buf.byteLength,placeholder_count:phs.length});
+   if(dbErr){await cloud.storage.from(ICES_TEMPLATE_BUCKET).remove([objectPath]);throw dbErr;}
+   await audit('template-add-shared',name);toast('Template uploaded to the shared ICES library. All users can now see it.');
+  }else{
+   let localName=name,base=name,v=1;while(T.some(t=>t.name===localName))localName=`${base} (v${++v})`;
+   await put('templates',{id:uid(),name:localName,data:buf,size:buf.byteLength,created:Date.now(),phs});await audit('template-add-local',localName);toast('Saved in this browser only. Configure Supabase to share it with everyone.');
+  }
+  $('tname').value='';$('tfile').value='';await loadTpl();checkStorage();
+ }catch(e){e.name==='QuotaExceededError'?fail(e):toast('Not saved: '+(e.message||e),8000)}
+};
 window.tAct=async(a,id)=>{const t=T.find(x=>x.id===id);if(!t)return;
  if(a==='use'){$('tplSel').value=id;await onTpl();document.querySelector('[data-t=gen]').click()}
- if(a==='dl')saveFile(t.name+'.docx',new Blob([t.data]));
+ if(a==='dl')saveFile(t.name+'.docx',new Blob([t.data],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
  if(a==='prev'){document.querySelector('[data-t=gen]').click();$('pdoc').style.display='block';$('prevCard').style.display='block';renderDoc(t.data)}
+ if(t.cloud&&(a==='ren'||a==='del'))return toast('Shared templates are managed centrally. Contact the ICES administrator for changes.',7000);
  if(a==='ren'){const n=(prompt('New name',t.name)||'').trim();if(n&&n!==t.name){if(T.some(x=>x.name===n))return toast('That name already exists.');t.name=n;await put('templates',t).catch(fail);await audit('template-rename',n);loadTpl()}}
- if(a==='del'){const used=(await all('history')).filter(h=>h.templateId===id).length;
-  if(!confirm(used?`This template is referenced by ${used} history record(s). The records stay, but you could not regenerate from this template. Delete “${t.name}” anyway?`:`Delete template “${t.name}”? Download a backup first if unsure.`))return;
-  await del('templates',id);await audit('template-delete',t.name+(used?` (referenced by ${used} history records)`:''));loadTpl();checkStorage()}};
-$('tbk').onclick=async()=>{if(!T.length)return toast('No templates to back up.');const z=new JSZip();z.file('manifest.json',JSON.stringify(T.map(t=>({file:t.id+'.docx',name:t.name,created:t.created}))));T.forEach(t=>z.file(t.id+'.docx',t.data));
- const b=await z.generateAsync({type:'blob'});await saveFile(`ices-templates-backup-${new Date().toISOString().slice(0,10)}.zip`,b);ls('lastBackup',Date.now());$('bkinfo').textContent='Backup file created '+new Date().toLocaleString()+'. Keep it somewhere safe.'};
-$('trs').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const z=await JSZip.loadAsync(await f.arrayBuffer()),m=JSON.parse(await z.file('manifest.json').async('string'));let n=0;
- for(const it of m){const buf=await z.file(it.file).async('arraybuffer');const zz=await JSZip.loadAsync(buf);if(!zz.file('word/document.xml'))continue;let name=it.name,v=1;while(T.some(t=>t.name===name))name=`${it.name} (restored${v>1?' '+v:''})`,v++;
-  const phs=await detectPlaceholders(buf,env);const rec={id:uid(),name,data:buf,size:buf.byteLength,created:Date.now(),phs};await put('templates',rec);T.push(rec);n++}
- await audit('template-restore',n+' template(s)');toast(n+' template(s) restored. Existing ones were not overwritten.');loadTpl()}catch(x){toast('Restore failed: '+x.message,7000)}e.target.value=''};
+ if(a==='del'){const used=(await all('history')).filter(h=>h.templateId===id).length;if(!confirm(used?`This template is referenced by ${used} history record(s). Delete anyway?`:`Delete template “${t.name}”? Download a backup first if unsure.`))return;await del('templates',id);await audit('template-delete',t.name+(used?` (referenced by ${used} history records)`:''));loadTpl();checkStorage()}
+};
+$('tbk').onclick=async()=>{const local=await all('templates');if(!local.length)return toast('No local templates to back up. Shared templates are already in cloud storage.');const z=new JSZip();z.file('manifest.json',JSON.stringify(local.map(t=>({file:t.id+'.docx',name:t.name,created:t.created}))));local.forEach(t=>z.file(t.id+'.docx',t.data));const b=await z.generateAsync({type:'blob'});await saveFile(`ices-templates-backup-${new Date().toISOString().slice(0,10)}.zip`,b);ls('lastBackup',Date.now());$('bkinfo').textContent='Local backup created '+new Date().toLocaleString()+'.';};
+$('trs').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const z=await JSZip.loadAsync(await f.arrayBuffer()),m=JSON.parse(await z.file('manifest.json').async('string'));let n=0;for(const it of m){const entry=z.file(it.file);if(!entry)continue;const buf=await entry.async('arraybuffer');const zz=await JSZip.loadAsync(buf);if(!zz.file('word/document.xml'))continue;let name=it.name,v=1;while(T.some(t=>t.name===name))name=`${it.name} (restored${v>1?' '+v:''})`,v++;const phs=await detectPlaceholders(buf,env);if(cloud){const id=crypto.randomUUID(),objectPath=id+'.docx';const {error:upErr}=await cloud.storage.from(ICES_TEMPLATE_BUCKET).upload(objectPath,new Blob([buf]),{contentType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});if(upErr)throw upErr;const {error:dbErr}=await cloud.from('ices_templates').insert({id,name,object_path:objectPath,size_bytes:buf.byteLength,placeholder_count:phs.length});if(dbErr)throw dbErr;}else{await put('templates',{id:uid(),name,data:buf,size:buf.byteLength,created:Date.now(),phs});}n++;}await audit('template-restore',n+' template(s)');toast(n+' template(s) restored.');await loadTpl()}catch(x){toast('Restore failed: '+x.message,7000)}e.target.value=''};
 // ---- generate ----
 const S={wb:null,rows:[],cols:[],ph:[],map:{},buf:null,out:new Map(),errs:new Map(),batch:null,fname:''};
 const cfgQ=()=>ls('qrp')||DEFAULT_QR_PATTERN,cfgD=()=>ls('dfmt')||'DD-MM-YYYY',cfgM=()=>ls('mask')==='1';
@@ -2771,534 +2731,130 @@ $('tplSel').onchange=onTpl;$('addT').onclick=()=>document.querySelector('[data-t
 $('xls').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{S.fname=f.name;S.wb=XLSX.read(await f.arrayBuffer());$('sht').innerHTML=S.wb.SheetNames.map(n=>`<option>${esc(n)}</option>`).join('');loadSheet()}catch(x){toast('Could not read Excel file: '+x.message,7000)}};
 $('sht').onchange=loadSheet;
 function loadSheet(){const ws=S.wb.Sheets[$('sht').value];S.cols=(XLSX.utils.sheet_to_json(ws,{header:1})[0]||[]).map(String);S.rows=XLSX.utils.sheet_to_json(ws,{defval:''});S.out.clear();S.errs.clear();S.batch=null;$('shtHelp').textContent=S.wb.SheetNames.length>1?`This file has ${S.wb.SheetNames.length} tabs. Choose the one with candidate details.`:'Only one tab in this file, selected automatically.';buildMap()}
-function ready(){const t=!!S.buf,x=S.rows.length>0;$('rbtn').disabled=S.running;$('gbtn').disabled=$('gpdf').disabled=!(t&&x)||S.running;$('ready').textContent=!t?'Waiting: choose a saved template (or add one).':!x?'Waiting: upload your Excel file.':'Ready: '+S.rows.length+' candidates will be generated.'}
+function ready(){const t=!!S.buf,x=S.rows.length>0;$('gbtn').disabled=$('gpdf').disabled=!(t&&x)||S.running;$('ready').textContent=!t?'Waiting: choose a saved template (or add one).':!x?'Waiting: upload your Excel file.':'Ready: '+S.rows.length+' candidates will be generated.'}
 function buildMap(){ready();if(!S.rows.length||!S.buf){$('map').innerHTML='<div class="mut">Choose a template and upload your Excel file to see the field mapping.</div>';$('issues').innerHTML='';$('cand').innerHTML='';$('cnt').textContent='';$('pvals').innerHTML='';$('qtext').textContent='';$('qinfo').innerHTML='';return}
  S.map=autoMap(S.ph,S.cols);drawMap();
- $('cand').innerHTML=S.rows.map((r,i)=>`<option value="${i}">${i+1}. ${esc(r[S.map.Name]||Object.values(r)[0])}</option>`).join('');$('cnt').textContent=S.rows.length+' candidates';$('dbtn').style.display=$('rbtn').style.display=$('dpdf2').style.display='none';$('gstat').textContent='';$('gerr').innerHTML='';$('pbar').style.width='0';showPrev()}
+ $('cand').innerHTML=S.rows.map((r,i)=>`<option value="${i}">${i+1}. ${esc(r[S.map.Name]||Object.values(r)[0])}</option>`).join('');$('cnt').textContent=S.rows.length+' candidates';$('dbtn').style.display=$('rbtn').style.display='none';$('gstat').textContent='';$('gerr').innerHTML='';$('pbar').style.width='0';showPrev()}
 function drawMap(){$('map').innerHTML=S.ph.map(p=>`<div><label>${esc(p)}</label><select data-p="${esc(p)}"><option value="">— not mapped —</option>${S.cols.map(c=>`<option ${S.map[p]===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>`).join('');
  $('map').querySelectorAll('select').forEach(s=>s.onchange=()=>{S.map[s.dataset.p]=s.value;check();showPrev()});check()}
 function check(){const iss=validate(S.rows,S.map,undefined,S.cols),un=S.ph.filter(p=>!S.map[p]);S.iss=iss;
  $('issues').innerHTML=(un.length?`<div class="warn">Not mapped (will print blank): ${un.map(esc).join(', ')}</div>`:'')+(iss.length?`<div class="bad">${iss.length} problem(s): ${iss.slice(0,8).map(i=>i.type==='duplicate'?`row ${i.row} duplicates certificate no. ${esc(i.value)} (row ${i.firstRow})`:`row ${i.row} missing ${i.field}`).join('; ')}${iss.length>8?' …':''}. Duplicates block generation; rows with missing values are skipped and reported.</div>`:'<div class="ok">All checks passed.</div>')}
 const vals=r=>{const v=rowValues(r,S.map,cfgD());const have=new Set(Object.keys(v).filter(k=>v[k]!=='').map(canon));
  for(const col of S.cols){if(have.has(canon(col)))continue;const x=formatValue(col,r[col],cfgD());if(x==='')continue;for(const k of Object.keys(v))if(canon(k)===canon(col))delete v[k];v[col]=x;have.add(canon(col))}
- if(cfgM())for(const k in v)if(canon(k)==='aadharno')v[k]=maskAadhaar(v[k]);
- if(typeof VER!=='undefined'){const u=VER.urlFor(r);if(u)Object.defineProperty(v,'__vurl',{value:u})}return v};
+ if(cfgM())for(const k in v)if(canon(k)==='aadharno')v[k]=maskAadhaar(v[k]);return v};
 const cfgE=()=>ls('qecc')||'M';
 function qrCanvas(text,scaleMin){const q=qrcode(0,cfgE());q.addData(text,'Byte');q.make();const n=q.getModuleCount(),m=4,sc=Math.max(4,Math.ceil(scaleMin/(n+2*m))),sz=(n+2*m)*sc,c=document.createElement('canvas');c.width=c.height=sz;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,sz,sz);x.fillStyle='#000';for(let r=0;r<n;r++)for(let k=0;k<n;k++)if(q.isDark(r,k))x.fillRect((k+m)*sc,(r+m)*sc,sc,sc);return{c,n}}
 async function qrPng(text){const{c}=qrCanvas(text,1200);const b=await new Promise(r=>c.toBlob(r,'image/png'));return new Uint8Array(await b.arrayBuffer())}
 async function showPrev(){const r=S.rows[+$('cand').value||0];if(!r)return;const v=vals(r),text=qrText(cfgQ(),v);$('pvals').innerHTML=Object.entries(v).map(([k,x])=>`<tr><th>${esc(k)}</th><td>${esc(x)}</td></tr>`).join('');$('qtext').textContent=text;
- try{const{c,n}=qrCanvas(text,380),d=$('qr');d.width=c.width;d.height=c.height;d.getContext('2d').drawImage(c,0,0);const qi=mopts().qrIn,mm=qi*25.4/(n+8),ver=(n-17)/4;
-  $('qinfo').innerHTML=mm>=0.45?`<span class="ok">QR version ${ver}: each square prints about ${mm.toFixed(2)} mm at ${qi.toFixed(2)} inch. Easy to scan.</span>`:`<span class="${mm>=0.35?'warn':'bad'}">QR version ${ver} is dense: each square prints only about ${mm.toFixed(2)} mm at ${qi.toFixed(2)} inch, so phones may struggle on paper. Use the compact pattern or error correction L in QR &amp; Settings.</span>`}catch(e){$('qinfo').innerHTML='<span class="bad">QR could not be made: '+esc(e.message)+'</span>'}$('pdoc').style.display='none'}
+ try{const{c,n}=qrCanvas(text,380),d=$('qr');d.width=c.width;d.height=c.height;d.getContext('2d').drawImage(c,0,0);const mm=1.2*25.4/(n+8),ver=(n-17)/4;
+  $('qinfo').innerHTML=mm>=0.45?`<span class="ok">QR version ${ver}: each square prints about ${mm.toFixed(2)} mm at 1.2 inch. Easy to scan.</span>`:`<span class="${mm>=0.35?'warn':'bad'}">QR version ${ver} is dense: each square prints only about ${mm.toFixed(2)} mm at 1.2 inch, so phones may struggle on paper. Use the compact pattern or error correction L in QR &amp; Settings.</span>`}catch(e){$('qinfo').innerHTML='<span class="bad">QR could not be made: '+esc(e.message)+'</span>'}$('pdoc').style.display='none'}
 $('cand').onchange=showPrev;
 async function renderDoc(buf){const box=$('pdoc');box.style.display='block';box.textContent='';try{if(!window.docx)throw Error('preview library unavailable');await docx.renderAsync(new Blob([buf]),box,null,{inWrapper:false})}catch(e){box.textContent='Preview could not be drawn here ('+e.message+'). Generate and open the .docx in Word.'}}
 $('pbtn').onclick=async()=>{const r=S.rows[+$('cand').value||0],v=vals(r);try{await renderDoc(await mergeDocx(S.buf,v,await qrPng(qrText(cfgQ(),v)),env,mopts()))}catch(e){toast('Preview failed: '+e.message)}};
 const mopts=()=>({qrIn:parseFloat(ls('qsz'))||1.05,downIn:ls('qdn')===null?0.1:parseFloat(ls('qdn'))});
 const BAT=`@echo off
+setlocal
 cd /d "%~dp0"
-mkdir PDF 2>nul
-echo Trying Microsoft Word...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Convert-to-PDF.ps1"
-if %errorlevel%==0 goto done
-echo Word was not usable. Trying LibreOffice...
-set "SO=C:\\Program Files\\LibreOffice\\program\\soffice.exe"
-if not exist "%SO%" set "SO=C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe"
-if not exist "%SO%" (echo Neither Microsoft Word nor LibreOffice was found. Install LibreOffice free from libreoffice.org, then run this again.& pause & exit /b 1)
-"%SO%" --headless --convert-to pdf --outdir PDF *.docx
+if not exist "*.docx" (echo No Word certificates found in this folder.& pause & exit /b 1)
+if not exist "PDF" mkdir "PDF"
+echo Trying Microsoft Word PDF export first (best layout match)...
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Convert-to-PDF.ps1"
+if not errorlevel 1 goto verify
+ echo Microsoft Word conversion was unavailable or failed.
+echo Trying LibreOffice...
+set "SO="
+if exist "%ProgramFiles%\LibreOffice\program\soffice.exe" set "SO=%ProgramFiles%\LibreOffice\program\soffice.exe"
+if not defined SO if exist "%ProgramFiles(x86)%\LibreOffice\program\soffice.exe" set "SO=%ProgramFiles(x86)%\LibreOffice\program\soffice.exe"
+if not defined SO for %%I in (soffice.exe) do set "SO=%%~$PATH:I"
+if not defined SO (echo LibreOffice was not found. Install it from https://www.libreoffice.org/ and run this file again.& pause & exit /b 1)
+"%SO%" --headless --convert-to pdf --outdir "%~dp0PDF" "%~dp0*.docx"
+if errorlevel 1 (echo LibreOffice conversion failed.& pause & exit /b 1)
+:verify
+for %%F in ("PDF\*.pdf") do if exist "%%~fF" goto done
+echo No PDF files were created. Check that the ZIP was fully extracted and Word or LibreOffice is installed.
+pause
+exit /b 1
 :done
-echo Done. PDFs are in the PDF folder.
-pause`;
+echo.
+echo Conversion finished. Open the PDF folder to find your certificates.
+start "" "%~dp0PDF"
+pause
+endlocal`;
 const PS1=`$ErrorActionPreference = 'Stop'
 $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $out = Join-Path $dir 'PDF'
 New-Item -ItemType Directory -Force $out | Out-Null
-$word = New-Object -ComObject Word.Application
-$word.Visible = $false
-$word.DisplayAlerts = 0
+$files = @(Get-ChildItem -LiteralPath $dir -Filter '*.docx' -File)
+if ($files.Count -eq 0) { Write-Error 'No DOCX certificates found. Extract the complete ZIP first.'; exit 2 }
+$word = $null
+$failed = @()
 try {
-  Get-ChildItem -Path $dir -Filter *.docx | ForEach-Object {
-    $doc = $word.Documents.Open($_.FullName, $false, $true)
-    $doc.ExportAsFixedFormat((Join-Path $out ($_.BaseName + '.pdf')), 17)
-    $doc.Close(0)
-    Write-Host ('Done: ' + $_.Name)
+  $word = New-Object -ComObject Word.Application
+  $word.Visible = $false
+  $word.DisplayAlerts = 0
+  foreach ($file in $files) {
+    $doc = $null
+    try {
+      $doc = $word.Documents.Open($file.FullName, $false, $true)
+      $pdf = Join-Path $out ($file.BaseName + '.pdf')
+      $doc.ExportAsFixedFormat($pdf, 17)
+      if (-not (Test-Path -LiteralPath $pdf)) { throw 'Word did not create the PDF file.' }
+      Write-Host ('PDF created: ' + $file.Name)
+    } catch {
+      $failed += ($file.Name + ': ' + $_.Exception.Message)
+    } finally {
+      if ($doc -ne $null) { $doc.Close(0) }
+    }
   }
-} finally { $word.Quit() }
+} catch {
+  Write-Error ('Microsoft Word automation could not start: ' + $_.Exception.Message)
+  exit 3
+} finally {
+  if ($word -ne $null) { $word.Quit() }
+}
+if ($failed.Count -gt 0) {
+  $failed | ForEach-Object { Write-Host $_ }
+  exit 4
+}
+Write-Host ('Successfully converted ' + $files.Count + ' certificate(s).')
 `;
 const SH=`#!/bin/sh
+set -eu
 cd "$(dirname "$0")"
-SO=$(command -v soffice || command -v libreoffice || echo /Applications/LibreOffice.app/Contents/MacOS/soffice)
+SO=$(command -v soffice || command -v libreoffice || true)
+if [ -z "$SO" ]; then echo "LibreOffice is required. Install it from https://www.libreoffice.org/"; exit 1; fi
 mkdir -p PDF
-"$SO" --headless --convert-to pdf --outdir PDF *.docx && echo "Done. PDFs are in the PDF folder."
+set -- ./*.docx
+[ -e "$1" ] || { echo "No DOCX files found. Extract the complete ZIP first."; exit 1; }
+"$SO" --headless --convert-to pdf --outdir PDF "$@"
+echo "Conversion finished. PDFs are in the PDF folder."
 `;
 const safe=s=>String(s).replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim().slice(0,80);
 async function run(onlyFailed,fmt){if(S.running)return;S.fmt=fmt||S.fmt||'docx';const sto=await checkStorage();if(sto&&sto.pct>=85)return toast('Storage is still ≥85% after cleanup. Delete or back up templates, then retry.',8000);
  const dup=(S.iss||[]).filter(i=>i.type==='duplicate');if(dup.length)return toast('Fix duplicate certificate numbers first (row '+dup[0].row+').',7000);
  S.running=true;$('gbtn').disabled=$('gpdf').disabled=$('rbtn').disabled=true;S.batch=S.batch||uid();const miss=new Set((S.iss||[]).filter(i=>i.type==='missing').map(i=>i.row-2));
  const idx=[...S.rows.keys()].filter(i=>onlyFailed?S.errs.has(i):true);let n=0;
- if(typeof VER!=='undefined'&&VER.enabled()){$('gstat').textContent='Saving certificate records to the online database…';try{await VER.publish(idx.filter(i=>!miss.has(i)))}catch(e){S.running=false;ready();$('gstat').innerHTML='<b class="bad">Stopped: could not save to the online database.</b> '+esc(e.message||e);return toast('Online save failed: '+(e.message||e),9000)}}
  for(const i of idx){try{if(miss.has(i))throw Error('Missing required value (Name or CertificateNo)');const v=vals(S.rows[i]),cn=Object.entries(v).find(([k])=>canon(k)==='certificateno')?.[1]||'',nm=v.Name||'';
    const dx=await mergeDocx(S.buf,v,await qrPng(qrText(cfgQ(),v)),env,mopts());S.out.set(i,{name:`${safe(cn)}_${safe(nm)}.docx`.replace(/^_/,''),data:dx});S.errs.delete(i)}catch(e){S.errs.set(i,String(e.message||e).replace(/\d{8,}/g,'[number hidden]'))}
   n++;$('pbar').style.width=(n/idx.length*100)+'%';$('gstat').textContent=`Processing ${n}/${idx.length}… OK ${S.out.size}, failed ${S.errs.size}`;if(n%3===0)await tick()}
- const t=T.find(x=>x.id===$('tplSel').value),rec={id:S.batch,created:Date.now(),template:t.name,templateId:t.id,excel:S.fname,sheet:$('sht').value,total:S.rows.length,ok:S.out.size,failed:S.errs.size,format:S.fmt==='pdf'?'Word + PDF converter (ZIP)':'Word (ZIP)',errors:[...S.errs].slice(0,50),rows:[...S.out.keys()].sort((a,b)=>a-b).map(i=>{const v=vals(S.rows[i]);return{v:{...v},u:v.__vurl||''}})};
+ const t=T.find(x=>x.id===$('tplSel').value),rec={id:S.batch,created:Date.now(),template:t.name,templateId:t.id,excel:S.fname,sheet:$('sht').value,total:S.rows.length,ok:S.out.size,failed:S.errs.size,format:S.fmt==='pdf'?'Word certificates + PDF converter package':'Word (ZIP)',errors:[...S.errs].slice(0,50)};
  try{await put('history',rec);$('gstat').innerHTML=`<b class="${S.errs.size?'warn':'ok'}">${S.errs.size?'Finished with failures':'Completed'}</b>: ${S.out.size} generated, ${S.errs.size} failed of ${S.rows.length}. History saved.`}catch(e){fail(e);$('gstat').innerHTML=`<b class="bad">Not marked complete: history record could not be saved.</b> ${S.out.size} generated, ${S.errs.size} failed. You can still download the ZIP, then press Retry to save the record.`}
  $('gerr').innerHTML=S.errs.size?'<table><tr><th>Row</th><th>Candidate</th><th>Reason</th></tr>'+[...S.errs].map(([i,m])=>`<tr><td>${i+2}</td><td>${esc(S.rows[i][S.map.Name]||'')}</td><td class="bad">${esc(m)}</td></tr>`).join('')+'</table>':'';
- $('dbtn').textContent=S.fmt==='pdf'?'Download separate PDFs (ZIP)':'Download ZIP';$('dbtn').style.display=S.out.size?'inline-block':'none';$('dpdf2').style.display=S.out.size?'inline-block':'none';$('rbtn').style.display=S.errs.size?'inline-block':'none';S.running=false;ready();checkStorage()}
-const go=f=>{S.out.clear();S.errs.clear();S.batch=null;return run(false,f)};$('gbtn').onclick=()=>go('docx');
-$('gpdf').onclick=async()=>{const t=T.find(x=>x.id===$('tplSel').value);if(!t)return;
- if(!t.marks){toast('One-time setup for this template: save its PDF from Word (3 quick steps).',9000);return pdfSetup(t.id,()=>$('gpdf').click())}
- await go('docx');if(S.out.size)await pdfWord()};$('rbtn').onclick=()=>run(true);
+ $('dbtn').style.display=S.out.size?'inline-block':'none';$('rbtn').style.display=S.errs.size?'inline-block':'none';S.running=false;ready();checkStorage()}
+const go=f=>{S.out.clear();S.errs.clear();S.batch=null;run(false,f)};$('gbtn').onclick=()=>go('docx');$('gpdf').onclick=()=>go('pdf');$('rbtn').onclick=()=>run(true);
 $('dbtn').onclick=async()=>{const z=new JSZip(),used=new Set();for(const[,f]of S.out){let n=f.name;while(used.has(n))n=n.replace(/\.docx$/,'_dup.docx');used.add(n);z.file(n,f.data)}
- if(S.fmt==='pdf'){z.file('Convert-to-PDF.bat',BAT.replace(/\n/g,'\r\n'));z.file('Convert-to-PDF.ps1','\ufeff'+PS1.replace(/\n/g,'\r\n'));z.file('Convert-to-PDF.sh',SH);z.file('READ-ME.txt','Unzip this whole folder first. Then double-click Convert-to-PDF.bat (Windows; uses Microsoft Word if installed, otherwise install free LibreOffice from libreoffice.org) or run Convert-to-PDF.sh (Mac/Linux; needs LibreOffice). A PDF folder with one PDF per certificate will be created.')}
- await saveFile('ICES_'+(S.fmt==='pdf'?'PDF':'Word')+'_Certificates_'+new Date().toISOString().slice(0,10)+'.zip',await z.generateAsync({type:'blob',compression:'DEFLATE'}))};
+ if(S.fmt==='pdf'){z.file('Convert-to-PDF.bat',BAT.replace(/\n/g,'\r\n'));z.file('Convert-to-PDF.ps1','\ufeff'+PS1.replace(/\n/g,'\r\n'));z.file('Convert-to-PDF.sh',SH);z.file('READ-ME.txt','PDF CONVERSION INSTRUCTIONS\r\n\r\n1. Extract this ZIP completely into a normal folder. Do not run the converter from inside the ZIP preview.\r\n2. Windows: double-click Convert-to-PDF.bat. It tries Microsoft Word first, which gives the closest match to the original DOCX layout. If Word is unavailable, it tries LibreOffice.\r\n3. Mac/Linux: install LibreOffice and run Convert-to-PDF.sh.\r\n4. Your PDFs will be saved in the PDF subfolder.\r\n\r\nImportant: the browser creates the DOCX certificates. PDF conversion runs locally on your computer. LibreOffice may render some Word-specific fonts or layout features differently. For the closest match, use desktop Microsoft Word.')}
+ await saveFile('ICES_'+(S.fmt==='pdf'?'PDF_Conversion_Package':'Word')+'_Certificates_'+new Date().toISOString().slice(0,10)+'.zip',await z.generateAsync({type:'blob',compression:'DEFLATE'}))};
 // ---- history ----
 async function renderHist(){const h=(await all('history')).sort((a,b)=>b.created-a.created);
- $('hlist').innerHTML='<tr><th><input type="checkbox" id="hall" title="Select all" style="width:auto"></th><th>Date</th><th>Template</th><th>Excel</th><th>Total</th><th>OK</th><th>Failed</th><th>Format</th><th></th></tr>'+(h.map(r=>`<tr><td><input type="checkbox" class="hc" value="${r.id}" style="width:auto"></td><td>${new Date(r.created).toLocaleString()}</td><td>${esc(r.template)}</td><td>${esc(r.excel)}</td><td>${r.total}</td><td class="ok">${r.ok}</td><td class="${r.failed?'bad':''}">${r.failed}</td><td>${esc(r.format)}</td><td><button class="b s" onclick="hPdf('${r.id}',this)">PDF</button> <button class="b d" onclick="hDel('${r.id}')">Delete</button></td></tr>`).join('')||'<tr><td colspan=9 class="mut">No batches yet.</td></tr>');
+ $('hlist').innerHTML='<tr><th></th><th>Date</th><th>Template</th><th>Excel</th><th>Total</th><th>OK</th><th>Failed</th><th>Format</th><th></th></tr>'+(h.map(r=>`<tr><td><input type="checkbox" class="hc" value="${r.id}" style="width:auto"></td><td>${new Date(r.created).toLocaleString()}</td><td>${esc(r.template)}</td><td>${esc(r.excel)}</td><td>${r.total}</td><td class="ok">${r.ok}</td><td class="${r.failed?'bad':''}">${r.failed}</td><td>${esc(r.format)}</td><td><button class="b d" onclick="hDel('${r.id}')">Delete</button></td></tr>`).join('')||'<tr><td colspan=9 class="mut">No batches yet.</td></tr>');
  const a=(await all('audit')).sort((x,y)=>y.at-x.at).slice(0,50);$('alist').innerHTML='<tr><th>When</th><th>Action</th><th>Detail</th></tr>'+(a.map(r=>`<tr><td>${new Date(r.at).toLocaleString()}</td><td>${esc(r.action)}</td><td>${esc(r.detail)}</td></tr>`).join('')||'<tr><td colspan=3 class="mut">Nothing yet.</td></tr>')}
 window.hDel=async id=>{if(!confirm('Delete this history record? This cannot be undone.'))return;await del('history',id);await audit('history-delete','1 record');renderHist()};
 $('hdel').onclick=async()=>{const ids=[...document.querySelectorAll('.hc:checked')].map(x=>x.value);if(!ids.length)return toast('Select records first.');if(!confirm(`Delete ${ids.length} history record(s)? This cannot be undone.`))return;for(const i of ids)await del('history',i);await audit('history-delete',ids.length+' records');renderHist()};
-async function getAllOnlineCertificateRows(status){
- if(!VER.enabled())throw Error('Enable Online verification and configure Supabase in QR & Settings first.');
- if(!VER.signed())throw Error('Please sign in as the admin in QR & Settings first.');
- const out=[];let offset=0;
- while(true){status(`Loading online candidate records: ${out.length}…`);const rows=await(await VER.api(`certificates?select=token,certificate_no,name,created_at,revoked,data&order=created_at.asc&limit=1000&offset=${offset}`)).json();out.push(...rows);offset+=rows.length;if(rows.length<1000)break;await tick()}
- return out;
-}
-function flattenCertificateData(value,prefix='',out={}){
- if(value===null||value===undefined||value==='')return out;
- if(Array.isArray(value)){value.forEach((v,i)=>flattenCertificateData(v,`${prefix}${prefix?' ':''}${i+1}`,out));return out}
- if(typeof value==='object'){for(const [k,v] of Object.entries(value))flattenCertificateData(v,prefix?`${prefix} / ${k}`:k,out);return out}
- out[prefix||'Detail']=value;return out;
-}
-$('hexcel').onclick=async()=>{const b=$('hexcel'),st=$('hexportstat');b.disabled=true;try{const rows=await getAllOnlineCertificateRows(m=>st.textContent=m);if(!rows.length)throw Error('No online certificate records found.');const data=rows.map(r=>({ ...flattenCertificateData(r.data||{}),CertificateNumber:r.certificate_no,DatabaseName:r.name,VerificationStatus:r.revoked?'Revoked':'Valid',VerificationLink:VER.urlOf(r.token),IssuedAt:r.created_at}));const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'All Candidates');ws['!cols']=Object.keys(data[0]).map(k=>({wch:Math.min(38,Math.max(14,k.length+3))}));XLSX.writeFile(wb,'ICES_All_Candidates_'+new Date().toISOString().slice(0,10)+'.xlsx');st.textContent=`Excel downloaded: ${rows.length} candidate records.`}catch(e){st.textContent='Excel export failed: '+e.message}finally{b.disabled=false}};
-$('hpdf').onclick=async()=>{const b=$('hpdf'),st=$('hexportstat');if(!confirm('Create ONE combined PDF containing every online certificate record?'))return;b.disabled=true;try{const rows=await getAllOnlineCertificateRows(m=>st.textContent=m);if(!rows.length)throw Error('No online certificate records found.');const tp=layoutTpl();const res=await ICESPDF.build(tp,rows.length,async k=>onlineItem(rows[k]),mopts(),(n,m)=>st.textContent=`Rendering certificate ${n} of ${m}…`);await saveFile('ICES_All_Candidates_'+new Date().toISOString().slice(0,10)+'.pdf',new Blob([res.pdf],{type:'application/pdf'}));st.textContent=`Combined PDF downloaded: ${res.ok} candidate pages.`}catch(e){st.textContent='PDF export failed: '+e.message}finally{b.disabled=false}};
-
 // ---- settings ----
 $('qrp').value=cfgQ();$('dfmt').value=cfgD();$('mask').value=cfgM()?'1':'0';
 $('qsave').onclick=()=>{ls('qrp',$('qrp').value.trim()||DEFAULT_QR_PATTERN);toast('QR pattern saved.');showPrev&&S.rows.length&&showPrev()};$('qreset').onclick=()=>{$('qrp').value=DEFAULT_QR_PATTERN;ls('qrp',DEFAULT_QR_PATTERN)};
 $('qsz').value=mopts().qrIn;$('qdn').value=mopts().downIn;$('qsz').onchange=e=>ls('qsz',e.target.value);$('qdn').onchange=e=>ls('qdn',e.target.value);$('qecc').value=cfgE();$('qecc').onchange=e=>{ls('qecc',e.target.value);S.rows.length&&showPrev()};$('qcomp').onclick=()=>{const c='Cert:{CertificateNo}|Name:{Name}|DOB:{DOB}|Job:{JobRole}|Grade:{Grade}|Date:{IssueDate}';$('qrp').value=c;ls('qrp',c);S.rows.length&&showPrev();toast('Compact pattern saved.')};
-$('qlife').onclick=()=>{const c='Cert:{CertificateNo}|Name:{Name}|DOB:{DOB}|Job:{JobRole}|Grade:{Grade}|Date:{IssueDate}';ls('vron','0');ls('qrp',c);ls('qecc','M');$('qrp').value=c;$('qecc').value='M';$('vron').value='0';S.rows.length&&showPrev();toast('Lifetime QR is on: the details are inside the QR, so it scans forever with no website or database.',9000)};
 $('dfmt').onchange=e=>{ls('dfmt',e.target.value);S.rows.length&&showPrev()};$('mask').onchange=e=>{ls('mask',e.target.value);S.rows.length&&showPrev()};
 (async()=>{try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}await loadTpl();checkStorage()})();
-</script><script>
-tx('audit','readwrite',o=>o.clear()).catch(()=>{}); // delete any old audit entries
-$('hlist').onchange=e=>{if(e.target.id==='hall')document.querySelectorAll('.hc').forEach(c=>c.checked=e.target.checked);else if(e.target.classList.contains('hc')){const a=$('hall');if(a)a.checked=[...document.querySelectorAll('.hc')].every(c=>c.checked)}};
-/* ICES PDF-from-Word-template engine.
-   1) markerDocx(): copy of the Word template where every «field» is an invisible white marker.
-   2) parseMarks(): reads marker positions from the PDF the user exported from Word.
-   3) build(): draws each candidate's values and QR on top of that PDF, one page per candidate. */
-const ICESPDF = (() => {
-  const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
-  const kids = (n, t) => Array.from(n.childNodes).filter((c) => c.nodeName === t);
-  const isQr = (n) => String(n).toLowerCase() === 'qrcode';
-  const PLAIN = /«\s*([^»]+?)\s*»|\{\s*([A-Za-z_][\w ]*?)\s*\}/g;
-  const ORDER = ['w:spacing', 'w:w', 'w:kern', 'w:position', 'w:sz', 'w:szCs', 'w:highlight', 'w:u', 'w:effect', 'w:bdr', 'w:shd', 'w:fitText', 'w:vertAlign', 'w:rtl', 'w:cs', 'w:em', 'w:lang', 'w:eastAsianLayout', 'w:specVanish', 'w:oMath'];
-  const ftype = (r) => { const f = kids(r, 'w:fldChar')[0]; return f && f.getAttribute('w:fldCharType'); };
-
-  const ENROLL = ENROLL_NAMES;
-  const ENROLL_PT = 12;
-  /* Alignment must be read the way Word resolves it: the paragraph itself, else its style (and the styles it is based on), else the document default. */
-  function parseStyles(xml) {
-    const info = { byId: new Map(), def: null, doc: null };
-    if (!xml) return info;
-    const d = new DOMParser().parseFromString(xml, 'text/xml');
-    const jcIn = (pPr) => { const j = pPr && kids(pPr, 'w:jc')[0]; return j ? j.getAttribute('w:val') : null; };
-    const dd = d.getElementsByTagName('w:pPrDefault')[0];
-    if (dd) info.doc = jcIn(kids(dd, 'w:pPr')[0]);
-    for (const st of Array.from(d.getElementsByTagName('w:style'))) {
-      if (st.getAttribute('w:type') !== 'paragraph') continue;
-      const id = st.getAttribute('w:styleId'), b = kids(st, 'w:basedOn')[0];
-      info.byId.set(id, { basedOn: b ? b.getAttribute('w:val') : null, jc: jcIn(kids(st, 'w:pPr')[0]) });
-      if (st.getAttribute('w:default') === '1') info.def = id;
-    }
-    return info;
-  }
-  function jcOf(p, sty) {
-    const pPr = kids(p, 'w:pPr')[0], own = pPr && kids(pPr, 'w:jc')[0];
-    if (own) return own.getAttribute('w:val');
-    const ps = pPr && kids(pPr, 'w:pStyle')[0];
-    let id = ps ? ps.getAttribute('w:val') : sty && sty.def;
-    for (let n = 0; id && sty && n < 20; n++) { const st = sty.byId.get(id); if (!st) break; if (st.jc) return st.jc; id = st.basedOn; }
-    return (sty && sty.doc) || 'left';
-  }
-  const alOf = (jc) => (jc === 'center' ? 'c' : jc === 'right' || jc === 'end' ? 'r' : 'l');
-  let STY = null;
-
-  let NAMES = [];
-  function marker(name, p, model) {
-    const idx = NAMES.findIndex((n) => n.toLowerCase() === String(name).toLowerCase());
-    const al = alOf(jcOf(p, STY));
-    const rp = kids(model, 'w:rPr')[0]; const b = rp && kids(rp, 'w:b')[0];
-    const bold = b && !['0', 'false'].includes(b.getAttribute('w:val'));
-    return `§${idx}${al}${bold ? 'b' : ''}§`;
-  }
-  function whiten(doc, run) {
-    let rPr = kids(run, 'w:rPr')[0];
-    if (!rPr) { rPr = doc.createElementNS(W, 'w:rPr'); run.insertBefore(rPr, run.firstChild); }
-    kids(rPr, 'w:color').forEach((c) => rPr.removeChild(c));
-    const c = doc.createElementNS(W, 'w:color'); c.setAttribute('w:val', 'FFFFFF');
-    const before = Array.from(rPr.childNodes).find((n) => ORDER.includes(n.nodeName));
-    before ? rPr.insertBefore(c, before) : rPr.appendChild(c);
-  }
-  function textRun(doc, model, text) {
-    const r = model.cloneNode(false);
-    const rPr = kids(model, 'w:rPr')[0]; if (rPr) r.appendChild(rPr.cloneNode(true));
-    const t = doc.createElementNS(W, 'w:t'); t.setAttribute('xml:space', 'preserve'); t.appendChild(doc.createTextNode(text));
-    r.appendChild(t); return r;
-  }
-  // Same QR box handling as the real merge: drop the empty first line and zero the inner margins.
-  function qrGeom(para) {
-    for (const r of kids(para, 'w:r')) {
-      const c = Array.from(r.childNodes).filter((x) => x.nodeName !== 'w:rPr');
-      if (c.length && c.every((x) => x.nodeName === 'w:br')) para.removeChild(r);
-    }
-    for (let n = para; n; n = n.parentNode) {
-      if (n.nodeName !== 'w:txbxContent') continue;
-      const tb = n.parentNode;
-      if (tb.nodeName === 'v:textbox') tb.setAttribute('inset', '0,0,0,0');
-      else if (tb.nodeName === 'wps:txbx') { const bp = tb.parentNode.getElementsByTagName('wps:bodyPr')[0]; if (bp) ['lIns', 'tIns', 'rIns', 'bIns'].forEach((a) => bp.setAttribute(a, '0')); }
-      return;
-    }
-  }
-  function paragraphs(doc, fn) { const ps = doc.getElementsByTagName('w:p'); for (let i = 0; i < ps.length; i++) fn(ps[i]); }
-
-  function fields(doc) {
-    paragraphs(doc, (p) => {
-      let f = null;
-      for (const n of Array.from(p.childNodes)) {
-        if (!f) { if (n.nodeName === 'w:r' && ftype(n) === 'begin') f = { nodes: [n], instr: '', phase: 'code', res: [] }; continue; }
-        f.nodes.push(n); if (n.nodeName !== 'w:r') continue;
-        const t = ftype(n), it = kids(n, 'w:instrText')[0]; if (it) f.instr += it.textContent;
-        if (t === 'separate') f.phase = 'res';
-        else if (t === 'end') {
-          const m = /MERGEFIELD\s+"?([^\s"\\]+)/i.exec(f.instr);
-          if (m) {
-            const model = f.res[0] || f.nodes[0];
-            const run = textRun(doc, model, marker(m[1], p, model)); whiten(doc, run); if (ENROLL.has(canon(m[1]))) setSz(doc, run, ENROLL_PT * 2);
-            f.nodes[0].parentNode.insertBefore(run, f.nodes[0]);
-            if (isQr(m[1])) qrGeom(p);
-            f.nodes.forEach((x) => x.parentNode && x.parentNode.removeChild(x));
-          }
-          f = null;
-        } else if (f.phase === 'res' && !t) f.res.push(n);
-      }
-    });
-  }
-  function plain(doc) {
-    paragraphs(doc, (p) => {
-      const runs = kids(p, 'w:r').filter((r) => kids(r, 'w:t').length === 1 && !r.getElementsByTagName('w:drawing')[0]);
-      if (!runs.length) return;
-      const ts = runs.map((r) => kids(r, 'w:t')[0]); const full = ts.map((t) => t.textContent).join('');
-      if (!/[«{]/.test(full)) return;
-      const starts = []; let o = 0; ts.forEach((t) => { starts.push(o); o += t.textContent.length; });
-      const edits = [...full.matchAll(PLAIN)].map((m) => ({ s: m.index, e: m.index + m[0].length, name: (m[1] || m[2]).trim() }));
-      for (const ed of edits.reverse()) {
-        const si = starts.findLastIndex((x) => x <= ed.s), ei = starts.findLastIndex((x) => x < ed.e);
-        const pre = ts[si].textContent.slice(0, ed.s - starts[si]), post = ts[ei].textContent.slice(ed.e - starts[ei]);
-        for (let k = si + 1; k <= ei; k++) ts[k].textContent = '';
-        ts[si].textContent = pre + marker(ed.name, p, runs[si]) + (si === ei ? post : ''); ts[si].setAttribute('xml:space', 'preserve');
-        if (si !== ei) ts[ei].textContent = post;
-        if (ENROLL.has(canon(ed.name))) setSz(doc, runs[si], ENROLL_PT * 2);
-        whiten(doc, runs[si]); if (isQr(ed.name)) qrGeom(p);
-      }
-    });
-  }
-
-  /** Word template -> same template with invisible markers. Export this to PDF from Word. */
-  async function markerDocx(buf, names) {
-    NAMES = names || [];
-    const zip = await JSZip.loadAsync(buf);
-    STY = parseStyles(zip.file('word/styles.xml') ? await zip.file('word/styles.xml').async('string') : '');
-    for (const name of Object.keys(zip.files).filter((n) => /^word\/(document|header\d*|footer\d*)\.xml$/.test(n))) {
-      const doc = new DOMParser().parseFromString(await zip.file(name).async('string'), 'text/xml');
-      fields(doc); plain(doc); zip.file(name, new XMLSerializer().serializeToString(doc));
-    }
-    if (zip.file('word/settings.xml')) zip.file('word/settings.xml', (await zip.file('word/settings.xml').async('string')).replace(/<w:mailMerge>[\s\S]*?<\/w:mailMerge>/, ''));
-    return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' });
-  }
-
-  /** Read the marker positions out of the PDF exported from Word. */
-  async function parseMarks(pdfBuf, names) {
-    const lib = window.pdfjsLib; if (!lib) throw Error('PDF reader library could not be loaded. Check your internet connection and reload.');
-    lib.GlobalWorkerOptions.workerSrc = lib.GlobalWorkerOptions.workerSrc || 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    const pdf = await lib.getDocument({ data: new Uint8Array(pdfBuf.slice(0)) }).promise; const marks = [];
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const pg = await pdf.getPage(i), tc = await pg.getTextContent();
-      const items = tc.items, odd = (t) => (t.match(/§/g) || []).length % 2 === 1;
-      for (let k = 0; k < items.length; k++) {
-        const it = items[k]; let str = it.str || '';
-        // A narrow text box can wrap a marker onto the next line: join it with the piece directly below.
-        const sz = Math.hypot(it.transform[0], it.transform[1]) || it.height; let cur = it;
-        for (let n = 0; n < 3 && odd(str); n++) {
-          const cx = cur.transform[4] + cur.width / 2, cy = cur.transform[5];
-          const cont = items.filter((o) => o !== cur && (o.str || '').trim() && !(o.str || '').includes('§') && Math.abs(o.transform[4] + o.width / 2 - cx) < 60 && cy - o.transform[5] > 0 && cy - o.transform[5] < 2.2 * sz)
-            .sort((a, b) => (cy - a.transform[5]) - (cy - b.transform[5]))[0];
-          if (!cont) break; str += cont.str; cur = cont;
-        }
-        const joined = cur !== it, tot = Math.max(1, str.length);
-        for (const m of str.matchAll(/§\s*(\d+)\s*([lcr])(b?)\s*§/g)) {
-          if (!(names || [])[+m[1]]) continue;
-          // If other text shares the same piece as the marker, use only the marker's share of the piece's width.
-          const part = joined ? 1 : m[0].length / tot, off = joined ? 0 : m.index / tot;
-          marks.push({ page: i - 1, name: names[+m[1]], al: m[2], bold: !!m[3], x: it.transform[4] + it.width * off, y: it.transform[5], w: it.width * part, size: Math.hypot(it.transform[0], it.transform[1]) || it.height });
-        }
-      }
-    }
-    if (!marks.length) throw Error('No field markers were found in this PDF. Make sure you exported the prepared file (not the original Word file) with Save as PDF.');
-    return marks;
-  }
-
-  /** Width (points) of the text box each field sits in, so long values can be shrunk to fit in the PDF as well. */
-  async function boxWidths(buf, names) {
-    const zip = await JSZip.loadAsync(buf), out = {};
-    const doc = new DOMParser().parseFromString(await zip.file('word/document.xml').async('string'), 'text/xml');
-    paragraphs(doc, (p) => {
-      const instr = Array.from(p.getElementsByTagName('w:instrText')).map((i) => i.textContent).join(' ');
-      const found = [...instr.matchAll(/MERGEFIELD\s+"?([^\s"\\]+)/gi)].map((m) => m[1]);
-      const txt = Array.from(p.getElementsByTagName('w:t')).map((t) => t.textContent).join('');
-      [...txt.matchAll(PLAIN)].forEach((m) => found.push((m[1] || m[2]).trim()));
-      if (!found.length) return;
-      let box = null; for (let n = p; n; n = n.parentNode) if (n.nodeName === 'w:txbxContent') { box = n; break; }
-      if (!box || box.parentNode.nodeName !== 'wps:txbx') return;
-      let cx = 0; for (let n = box.parentNode.parentNode; n; n = n.parentNode) if (n.nodeName === 'wp:anchor' || n.nodeName === 'wp:inline') { const e = n.getElementsByTagName('wp:extent')[0]; if (e) cx = Number(e.getAttribute('cx')); break; }
-      if (cx) found.forEach((nm) => { if (!out[nm.toLowerCase()]) out[nm.toLowerCase()] = cx / 12700; });
-    });
-    return out;
-  }
-  const get = (v, name) => {
-    const ks = Object.keys(v);
-    const k = ks.find((x) => x.toLowerCase() === String(name).toLowerCase()) ?? ks.find((x) => canon(x) === canon(name));
-    return k === undefined ? '' : String(v[k] ?? '');
-  };
-
-  /** Placeholder names that sit directly in this paragraph (not in a text box nested inside it). */
-  function phIn(p) {
-    const runs = kids(p, 'w:r');
-    const instr = runs.flatMap((r) => kids(r, 'w:instrText')).map((i) => i.textContent).concat(kids(p, 'w:fldSimple').map((f) => f.getAttribute('w:instr') || '')).join(' ');
-    const found = [...instr.matchAll(/MERGEFIELD\s+"?([^\s"\\]+)/gi)].map((m) => m[1]);
-    const txt = runs.flatMap((r) => kids(r, 'w:t')).map((t) => t.textContent).join('');
-    [...txt.matchAll(PLAIN)].forEach((m) => found.push((m[1] || m[2]).trim()));
-    return found;
-  }
-  /** Real alignment of every placeholder, read from the Word template: {name: 'l'|'c'|'r'}; 'x' if the same name is aligned differently in two places. */
-  async function alignments(buf) {
-    const zip = await JSZip.loadAsync(buf), out = {};
-    const st = zip.file('word/styles.xml');
-    const sty = parseStyles(st ? await st.async('string') : '');
-    const doc = new DOMParser().parseFromString(await zip.file('word/document.xml').async('string'), 'text/xml');
-    paragraphs(doc, (p) => {
-      const found = phIn(p); if (!found.length) return;
-      const al = alOf(jcOf(p, sty));
-      found.forEach((nm) => { const k = nm.toLowerCase(); out[k] = out[k] === undefined || out[k] === al ? al : 'x'; });
-    });
-    return out;
-  }
-
-  // Text the standard PDF font cannot print (for example Hindi) is drawn as a picture of the text, in the same place and size.
-  const UFONT = '"Noto Sans Devanagari","Nirmala UI","Mangal","Segoe UI",Arial,sans-serif';
-  const latin = (f, val) => { try { f.widthOfTextAtSize(val, 10); return true; } catch (e) { return false; } };
-  let _mc = null;
-  const canvasWidth = (val, size, bold) => { _mc = _mc || document.createElement('canvas').getContext('2d'); _mc.font = `${bold ? 700 : 400} ${size * 8}px ${UFONT}`; return _mc.measureText(val).width / 8; };
-  async function textPng(val, size, bold) {
-    const S = 8, font = `${bold ? 700 : 400} ${size * S}px ${UFONT}`, c = document.createElement('canvas'), x = c.getContext('2d');
-    x.font = font; const w = x.measureText(val).width, asc = size * S * 1.15, desc = size * S * 0.5;
-    c.width = Math.max(1, Math.ceil(w)); c.height = Math.ceil(asc + desc);
-    x.font = font; x.fillStyle = '#000'; x.textBaseline = 'alphabetic'; x.fillText(val, 0, asc);
-    const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
-    return { png: new Uint8Array(await blob.arrayBuffer()), w: c.width / S, asc: asc / S, desc: desc / S };
-  }
-
-  /** count candidates; getItem(i) -> {v:{placeholder:value}, png:Uint8Array}. Returns {pdf, ok, fails}.
-      Every position comes from the Word template (marker positions + the template's own alignment). Nothing is hard-coded. */
-  async function build(tpl, count, getItem, opt, onProgress) {
-    const L = window.PDFLib; if (!L) throw Error('PDF library could not be loaded. Check your internet connection and reload.');
-    const out = await L.PDFDocument.create(), src = await L.PDFDocument.load(tpl.pdf);
-    const emb = await out.embedPages(src.getPages());
-    const F = await out.embedFont(L.StandardFonts.Helvetica), FB = await out.embedFont(L.StandardFonts.HelveticaBold);
-    let align = {}; try { align = await alignments(tpl.data); } catch (e) { /* fall back to the alignment saved with the layout */ }
-    const fails = []; let ok = 0;
-    for (let i = 0; i < count; i++) {
-      const before = out.getPageCount();
-      try {
-        const it = await getItem(i), img = await out.embedPng(it.png);
-        for (let pi = 0; pi < emb.length; pi++) {
-          const e = emb[pi], pg = out.addPage([e.width, e.height]); pg.drawPage(e);
-          for (const m of tpl.marks.filter((x) => x.page === pi)) {
-            if (isQr(m.name)) {
-              const sz = opt.qrIn * 72, cx = m.x + m.w / 2, top = m.y + m.size * 0.9 - opt.downIn * 72;
-              pg.drawImage(img, { x: cx - sz / 2, y: top - sz, width: sz, height: sz }); continue;
-            }
-            const val = get(it.v, m.name); if (!val) continue;
-            const f = m.bold ? FB : F, uni = !latin(f, val);
-            const wOf = (z) => (uni ? canvasWidth(val, z, m.bold) : f.widthOfTextAtSize(val, z));
-            let size = ENROLL.has(canon(m.name)) ? ENROLL_PT : m.size, w = wOf(size);
-            if (m.bw && w > m.bw * 0.96) { size = Math.max(size * 0.55, size * m.bw * 0.96 / w); w = wOf(size); }
-            const a0 = align[String(m.name).toLowerCase()], al = a0 && a0 !== 'x' ? a0 : m.al;
-            const x = al === 'c' ? m.x + m.w / 2 - w / 2 : al === 'r' ? m.x + m.w - w : m.x;
-            if (uni) {
-              const im = await textPng(val, size, m.bold), pic = await out.embedPng(im.png);
-              pg.drawImage(pic, { x, y: m.y - im.desc, width: im.w, height: im.asc + im.desc });
-            } else pg.drawText(val, { x, y: m.y, size, font: f, color: L.rgb(0, 0, 0) });
-          }
-        }
-        ok++;
-      } catch (e) {
-        while (out.getPageCount() > before) out.removePage(out.getPageCount() - 1);
-        fails.push({ i, msg: String(e.message || e) });
-      }
-      if (onProgress) onProgress(i + 1, count);
-      if (i % 3 === 2) await new Promise((r) => setTimeout(r, 0));
-    }
-    if (!ok) throw Error('No certificate could be made. ' + (fails[0] ? fails[0].msg : ''));
-    return { pdf: await out.save(), ok, fails };
-  }
-  return { markerDocx, parseMarks, boxWidths, alignments, build };
-})();
-
-/* ---- Every PDF follows the saved Word template. No coordinates are stored in this file. ---- */
-function layoutTpl(pref) {
-  const t = (pref && pref.marks && pref) || T.find((x) => x.id === $('tplSel').value && x.marks) || T.find((x) => x.marks);
-  if (!t) { const b = document.querySelector('[data-t=tpl]'); if (b) b.click(); throw Error('PDF follows your Word template. First open Saved Templates and set up the PDF layout for your template (one-time, 3 steps).'); }
-  return t;
-}
-const onlineVals = d=>({Name:d.name,AadharNo:d.aadhaar,SonOrDaughterOf:d.father,DOB:d.dob,Enrollment:d.enrollment_no,'job role':d.job_role,Duration:d.duration,'Training Centre':d.training_centre,District:d.district,State:d.state,'Assessment Partner':d.assessment_partner,Grade:d.grade,'Place of Issue':d.place_of_issue,'Date of Issue':d.date_of_issue,CertificateNo:d.certificate_no});
-async function onlineItem(row) {
-  const v = onlineVals(row.data || {}); if (!v.CertificateNo && row.certificate_no) v.CertificateNo = row.certificate_no;
-  Object.defineProperty(v, '__vurl', { value: VER.urlOf(row.token) });
-  return { v, png: await qrPng(qrText(cfgQ(), v)) };
-}
-/* ---- PDF that follows your Word template ---- */
-window.pdfSetup=async(id,then)=>{const t=T.find(x=>x.id===id);if(!t)return;let d=$('pdfdlg');
- if(!d){d=document.createElement('dialog');d.id='pdfdlg';d.style.cssText='max-width:560px;width:92vw;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);padding:20px';document.body.appendChild(d)}
- d.innerHTML=`<h2 style="margin:0 0 6px;font-size:17px">PDF layout for “${esc(t.name)}”</h2><p class="mut">Do this once for each template, and again whenever you change the Word design.</p><ol style="padding-left:20px"><li>Press <b>Download prepared Word file</b>.</li><li>Open it in Microsoft Word and choose <b>File, Save as, PDF</b>. The fields look empty on purpose.</li><li>Upload that PDF below.</li></ol><div class="acts"><button class="b" id="pdfprep">Download prepared Word file</button></div><label>Upload the PDF you saved from Word</label><input type="file" id="pdfup" accept=".pdf"><div id="pdfmsg" class="mut" style="margin-top:8px">${t.marks?'<span class="ok">A PDF layout is already saved ('+t.marks.length+' field positions). Upload a new PDF to replace it.</span>':'No PDF layout saved yet.'}</div><div class="acts"><button class="b s" id="pdfclose">Close</button></div>`;
- d.showModal();$('pdfclose').onclick=()=>d.close();
- $('pdfprep').onclick=async()=>{try{await saveFile(t.name.replace(/[^\w -]+/g,'')+' - PDF prep.docx',new Blob([await ICESPDF.markerDocx(t.data,t.phs)],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}))}catch(e){$('pdfmsg').innerHTML='<span class="bad">'+esc(e.message)+'</span>'}};
- $('pdfup').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const buf=await f.arrayBuffer(),marks=await ICESPDF.parseMarks(buf,t.phs),bw=await ICESPDF.boxWidths(t.data,t.phs);marks.forEach(m=>{m.bw=bw[m.name.toLowerCase()]||0});t.pdf=buf;t.marks=marks;await put('templates',t);$('pdfmsg').innerHTML=`<span class="ok">Saved. ${marks.length} field positions found.</span>`;await loadTpl();if(then){d.close();then()}}catch(x){$('pdfmsg').innerHTML='<span class="bad">'+esc(x.message)+'</span>'}}};
-async function pdfWord(){const t=T.find(x=>x.id===$('tplSel').value);if(!t)return;
- if(!t.marks){toast('First set up the PDF layout for this template.',8000);document.querySelector('[data-t=tpl]').click();return pdfSetup(t.id)}
- const idx=[...S.out.keys()].sort((a,b)=>a-b);$('dpdf2').disabled=true;
- try{const r=await ICESPDF.build(t,idx.length,async k=>{const v=vals(S.rows[idx[k]]);return{v,png:await qrPng(qrText(cfgQ(),v))}},mopts(),(n,m)=>{$('gstat').textContent=`Making PDF from your Word template: ${n}/${m}…`;$('pbar').style.width=(n/m*100)+'%'});
-  const bad=r.fails.map(f=>(S.rows[idx[f.i]][S.map.Name]||('row '+(idx[f.i]+2)))+': '+f.msg);
-  $('gstat').innerHTML=`<b class="${bad.length?'warn':'ok'}">PDF ready</b>: ${r.ok} page(s)${bad.length?'; '+bad.length+' skipped ('+esc(bad.slice(0,3).join('; '))+')':''}.`;
-  await saveFile('ICES_Certificates_'+new Date().toISOString().slice(0,10)+'.pdf',new Blob([r.pdf],{type:'application/pdf'}))}catch(e){toast('PDF failed: '+e.message,9000)}
- $('dpdf2').disabled=false}
-$('dpdf2').onclick=pdfWord;
-const histName=r=>'ICES_'+safe(String(r.excel||'batch').replace(/\.xlsx?$/i,''))+'_'+new Date(r.created).toISOString().slice(0,10)+'.pdf';
-window.hPdf=async(id,btn)=>{const r=(await all('history')).find(x=>x.id===id);if(!r)return;
- if(!r.rows||!r.rows.length)return toast('This batch was saved before the PDF button existed, so its details were not kept. Batches made from now on can be downloaded as PDF here. For older certificates use Online Records.',10000);
- if(btn)btn.disabled=true;
- try{const tp=layoutTpl(T.find(x=>x.id===r.templateId));
-  const res=await ICESPDF.build(tp,r.rows.length,async k=>{const v={...r.rows[k].v};if(r.rows[k].u)Object.defineProperty(v,'__vurl',{value:r.rows[k].u});return{v,png:await qrPng(qrText(cfgQ(),v))}},mopts(),(n,m)=>toast(`Making PDF ${n}/${m}…`,60000));toast('PDF ready.');await saveFile(histName(r),new Blob([res.pdf],{type:'application/pdf'}))}
- catch(e){toast('PDF failed: '+e.message,8000)}finally{if(btn)btn.disabled=false}};
-</script>
-<script>
-/* ---- Online verification (Supabase) + Online records ---- */
-const VER=(()=>{
- const g=k=>(ls(k)||'').trim(),tok=new Map();let sess=null;
- const NEWSITE='https://ices-verify.pages.dev';
- if(ls('vsite_pages')!=='1'){if(!g('vsite')||/workers\.dev/i.test(g('vsite')))ls('vsite',NEWSITE);ls('vsite_pages','1')} // one-time switch to the new verification address
- const cfg=()=>({url:g('sbu').replace(/\/+$/,''),key:g('sbk'),site:(g('vsite')||NEWSITE).replace(/\/+$/,''),email:g('sbe')});
- const enabled=()=>{const c=cfg();return !!(c.url&&c.key&&c.site)&&ls('vron')!=='0'};
- const urlOf=t=>cfg().site+'/c/'+t;
- const urlFor=r=>enabled()?urlOf(tok.get(r)||'PREVIEWTOKEN'):'';
- async function auth(body,grant){const c=cfg();let r;try{r=await fetch(`${c.url}/auth/v1/token?grant_type=${grant}`,{method:'POST',headers:{apikey:c.key,'Content-Type':'application/json'},body:JSON.stringify(body)})}catch(e){throw Error('Cannot reach Supabase. Check the project URL and your internet.')}
-  const j=await r.json().catch(()=>({}));if(!r.ok)throw Error(j.error_description||j.msg||j.message||('Sign-in failed ('+r.status+')'));
-  sess={access:j.access_token,refresh:j.refresh_token,exp:Date.now()+(j.expires_in||3600)*1000-60000};ls('sbr',j.refresh_token);return sess}
- const signIn=(email,pw)=>auth({email,password:pw},'password');
- const signed=()=>!!(sess||ls('sbr'));
- function signOut(){sess=null;try{localStorage.removeItem('sbr')}catch(e){}}
- async function jwt(){if(sess&&Date.now()<sess.exp)return sess.access;const rt=(sess&&sess.refresh)||ls('sbr');if(!rt)throw Error('Not signed in. Open “QR & Settings”, enter the admin password and press Save & sign in.');
-  try{await auth({refresh_token:rt},'refresh_token')}catch(e){signOut();throw Error('Your sign-in expired. Open “QR & Settings” and sign in again.')}return sess.access}
- async function api(path,o={}){const c=cfg();let r;try{r=await fetch(c.url+'/rest/v1/'+path,{method:o.method||'GET',headers:Object.assign({apikey:c.key,Authorization:'Bearer '+await jwt(),'Content-Type':'application/json'},o.headers||{}),body:o.body?JSON.stringify(o.body):undefined})}catch(e){if(e&&/Not signed|expired/.test(e.message))throw e;throw Error('Cannot reach the database. Check your internet.')}
-  if(!r.ok){let m='';try{const j=await r.json();m=j.message||j.hint||''}catch(e){}throw Error(`Database error ${r.status}${m?': '+m:''}${r.status===401||r.status===403?' (check that you signed in with the admin e-mail used in the SQL setup)':''}`)}return r}
- const KEYS={name:'name',aadhaar:'aadharno',father:'fathername',dob:'dob',enrollment_no:'enrollmentno',job_role:'jobrole',duration:'duration',training_centre:'trainingcenter',district:'district',state:'state',assessment_partner:'assessmentpartner',grade:'grade',place_of_issue:'issueplace',date_of_issue:'issuedate',certificate_no:'certificateno'};
- function build(r){const v=vals(r),by=new Map(Object.entries(v).map(([k,x])=>[canon(k),String(x??'').trim()])),d={};for(const k in KEYS)d[k]=by.get(KEYS[k])||'';return d}
- const iso=d=>d.toISOString().slice(0,10),MON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
- function dobIso(r){const col=Object.entries(S.map||{}).find(([ph])=>canon(ph)==='dob')?.[1]||S.cols.find(c=>canon(c)==='dob');let x=col?r[col]:'';if(x instanceof Date&&!isNaN(x))return iso(x);
-  if(typeof x==='number'&&x>1&&x<80000)return iso(excelSerialToDate(x));x=String(x||'').trim();let m;
-  if(m=x.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/))return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
-  if(m=x.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/))return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-  if(m=x.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3})[A-Za-z]*[-\/ ](\d{4})$/)){const i=MON.indexOf(m[2].toUpperCase());if(i>=0)return `${m[3]}-${String(i+1).padStart(2,'0')}-${m[1].padStart(2,'0')}`}return null}
- const ALPHA='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',newToken=()=> 'ICES'+[...crypto.getRandomValues(new Uint8Array(10))].map(x=>ALPHA[x%ALPHA.length]).join('');
- /** Save/refresh the record of each row. A certificate that already exists keeps its original link, so old QR codes keep working. */
- async function publish(idx){
-  const items=idx.map(i=>({r:S.rows[i],d:build(S.rows[i]),dob:dobIso(S.rows[i])}));if(!items.length)return;
-  const nos=[...new Set(items.map(x=>x.d.certificate_no).filter(Boolean))],exist=new Map();
-  for(let i=0;i<nos.length;i+=30){const part=nos.slice(i,i+30),q='('+part.map(n=>'"'+n.replace(/["\\]/g,'')+'"').join(',')+')';
-   const rows=await(await api('certificates?select=certificate_no,token&certificate_no=in.'+encodeURIComponent(q))).json();rows.forEach(x=>exist.set(x.certificate_no,x.token))}
-  const hh=await hasHidden();
-  const body=items.map(x=>{const t=exist.get(x.d.certificate_no)||newToken();tok.set(x.r,t);return Object.assign({token:t,certificate_no:x.d.certificate_no,name:x.d.name,dob_iso:x.dob,data:x.d},hh?{hidden:false}:{})});
-  for(let i=0;i<body.length;i+=100)await api('certificates?on_conflict=certificate_no',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:body.slice(i,i+100)})}
- let HID=null;
- async function hasHidden(){if(HID!==null)return HID;try{await api('certificates?select=hidden&limit=1');HID=true}catch(e){if(/hidden|column|400/i.test(e.message||''))HID=false;else return false}return HID}
- async function ping(){const c=cfg(),r=await fetch(`${c.url}/rest/v1/rpc/ping`,{method:'POST',headers:{apikey:c.key,Authorization:'Bearer '+c.key,'Content-Type':'application/json'},body:'{}'});if(!r.ok)throw Error('Database check failed ('+r.status+'). Did you run the SQL setup?');return r.json()}
- return{hasHidden,cfg,enabled,urlOf,urlFor,signIn,signed,signOut,api,publish,ping,tok}
-})();
-(function(){
- const st=m=>{$('vstat').innerHTML=m};
- const c=VER.cfg();$('vsite').value=c.site;$('sbu').value=c.url;$('sbk').value=c.key;$('sbe').value=c.email;$('vron').value=ls('vron')==='0'?'0':'1';
- const status=()=>st(VER.enabled()?(VER.signed()?'<b class="ok">Online verification is ON and you are signed in.</b> New QR codes will open '+esc(VER.cfg().site)+'/c/…':'<b class="warn">Online verification is ON but you are not signed in.</b> Enter the admin password and press Save &amp; sign in.'):'Online verification is OFF: QR codes will use the long text pattern below.');
- status();
- const keep=()=>{ls('vsite',$('vsite').value.trim().replace(/\/+$/,''));ls('sbu',$('sbu').value.trim().replace(/\/+$/,''));ls('sbk',$('sbk').value.trim());ls('sbe',$('sbe').value.trim());ls('vron',$('vron').value)};
- $('vsave').onclick=async()=>{keep();const c=VER.cfg();if(!/^https:\/\//.test(c.site)||!/^https:\/\//.test(c.url)||!c.key)return st('<b class="bad">Fill the site address and Supabase URL (both start with https://) and the anon key.</b>');
-  if($('sbp').value){try{st('Signing in…');await VER.signIn($('sbe').value.trim(),$('sbp').value);$('sbp').value='';toast('Signed in.')}catch(e){return st('<b class="bad">'+esc(e.message)+'</b>')}}
-  status();S.rows.length&&showPrev()};
- $('vout').onclick=()=>{VER.signOut();status();toast('Signed out.')};
- $('vtest').onclick=async()=>{keep();try{st('Testing…');const r=await VER.ping();st('<b class="ok">Connected.</b> Database says: '+esc(r))}catch(e){st('<b class="bad">'+esc(e.message)+'</b>')}};
- $('vron').onchange=()=>{keep();status();S.rows.length&&showPrev()};
- // ---- Online records
- const O={page:0,size:25,q:'',total:null,cache:new Map(),sel:new Set()};
- const lab=onlineVals;
- const ost=m=>$('ostat').innerHTML=m;
- const hf=async()=>(await VER.hasHidden())?'&hidden=eq.false':'';
- const SQLMSG='One-time setup needed: open Supabase > SQL Editor and run:  alter table public.certificates add column if not exists hidden boolean not null default false;  (also in SUPABASE_HIDE_COLUMN.sql). After that, removing records from this list never breaks their QR codes.';
- const inList=ts=>'token=in.'+encodeURIComponent('('+ts.map(t=>'"'+t+'"').join(',')+')');
- async function load(){
-  if(!VER.cfg().url){$('otab').innerHTML='';return ost('Fill the Supabase details in “QR &amp; Settings” first.')}
-  ost('Loading…');
-  try{let path=`certificates?select=token,certificate_no,name,created_at,revoked,data&order=created_at.desc&limit=${O.size}&offset=${O.page*O.size}`+await hf();
-   if(O.q){const q=O.q.replace(/[,()*"\\%]/g,' ').trim();if(q)path+='&or='+encodeURIComponent(`(name.ilike.*${q}*,certificate_no.ilike.*${q}*)`)}
-   const r=await VER.api(path,{headers:{Prefer:'count=exact'}}),rows=await r.json(),cr=r.headers.get('content-range')||'',m=cr.match(/\/(\d+)$/);O.total=m?+m[1]:null;
-   rows.forEach(x=>O.cache.set(x.token,x));
-   $('otab').innerHTML='<tr><th><input type="checkbox" id="oall" title="Select all on this page"></th><th>Certificate no.</th><th>Name</th><th>Saved</th><th>Status</th><th></th></tr>'+(rows.length?rows.map(x=>`<tr><td><input type="checkbox" class="oc" value="${esc(x.token)}" ${O.sel.has(x.token)?'checked':''}></td><td>${esc(x.certificate_no)}</td><td>${esc(x.name)}</td><td>${esc(new Date(x.created_at).toLocaleDateString())}</td><td>${x.revoked?'<b class="bad">Revoked</b>':'<span class="ok">Valid</span>'}</td><td><button class="b s" data-a="pdf" data-t="${esc(x.token)}">PDF</button> <button class="b s" data-a="cp" data-t="${esc(x.token)}">Copy link</button></td></tr>`).join(''):'<tr><td colspan="6" class="mut">No records found.</td></tr>');
-   $('oall').checked=rows.length>0&&rows.every(x=>O.sel.has(x.token));$('ocnt').textContent=O.sel.size?O.sel.size+' selected':'';
-   const pages=O.total==null?'':' of '+Math.max(1,Math.ceil(O.total/O.size));$('opg').textContent='Page '+(O.page+1)+pages;$('oprev').disabled=O.page===0;$('onext').disabled=rows.length<O.size||(O.total!=null&&(O.page+1)*O.size>=O.total);
-   $('osum').textContent=O.total==null?'':`${O.total} record(s) in the online database, using ${O.total*1.2/1024<1?'under 1':(O.total*1.2/1024).toFixed(1)} MB of the 500 MB free space.`;ost('');
-  }catch(e){ost('<b class="bad">'+esc(e.message)+'</b>')}}
- async function pdfOf(row){const tp=layoutTpl();return (await ICESPDF.build(tp,1,async()=>onlineItem(row),mopts())).pdf}
- const safeN=s=>String(s).replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim().slice(0,80);
- $('osgo').onclick=()=>{O.q=$('osq').value;O.page=0;load()};$('osq').onkeydown=e=>{if(e.key==='Enter')$('osgo').click()};
- $('oprev').onclick=()=>{O.page=Math.max(0,O.page-1);load()};$('onext').onclick=()=>{O.page++;load()};
- const updCnt=()=>{$('ocnt').textContent=O.sel.size?O.sel.size+' selected':'';const a=$('oall');if(a){const cs=[...document.querySelectorAll('.oc')];a.checked=cs.length>0&&cs.every(c=>c.checked)}};
- $('otab').onchange=e=>{if(e.target.id==='oall'){document.querySelectorAll('.oc').forEach(c=>{c.checked=e.target.checked;e.target.checked?O.sel.add(c.value):O.sel.delete(c.value)})}else if(e.target.classList.contains('oc'))e.target.checked?O.sel.add(e.target.value):O.sel.delete(e.target.value);updCnt()};
- $('oclr').onclick=()=>{O.sel.clear();document.querySelectorAll('.oc').forEach(c=>c.checked=false);updCnt()};
- $('oselall').onclick=async()=>{$('oselall').disabled=true;try{let off=0,n=0;for(;;){let path=`certificates?select=token&order=created_at.asc&limit=1000&offset=${off}`+await hf();if(O.q){const q=O.q.replace(/[,()*"\\%]/g,' ').trim();if(q)path+='&or='+encodeURIComponent(`(name.ilike.*${q}*,certificate_no.ilike.*${q}*)`)}
-   const rows=await(await VER.api(path)).json();rows.forEach(x=>O.sel.add(x.token));n+=rows.length;ost(`Selecting… ${n}`);if(rows.length<1000)break;off+=1000}
-   document.querySelectorAll('.oc').forEach(c=>c.checked=O.sel.has(c.value));updCnt();ost(`<b class="ok">${O.sel.size} record(s) selected${O.q?' (matching your search)':''}.</b> Press “Delete selected” to delete them.`)}catch(e){ost('<b class="bad">'+esc(e.message)+'</b>')}$('oselall').disabled=false};
- $('otab').onclick=async e=>{const b=e.target.closest('button[data-a]');if(!b)return;const row=O.cache.get(b.dataset.t);
-  if(b.dataset.a==='cp'){try{await navigator.clipboard.writeText(VER.urlOf(row.token));toast('Link copied.')}catch(x){prompt('Copy this link:',VER.urlOf(row.token))}}
-  else{b.disabled=true;try{const pdf=await pdfOf(row);await saveFile(`${safeN(row.certificate_no)}_${safeN(row.name)}.pdf`,new Blob([pdf],{type:'application/pdf'}))}catch(x){toast('PDF failed: '+x.message,7000)}b.disabled=false}};
- const selected=()=>{const t=[...O.sel];if(!t.length)toast('Tick one or more records first.');return t};
- $('opdf').onclick=async()=>{if(!confirm('Download every online certificate record (including records on other pages) as ONE multi-page PDF?'+(O.q?' Only records matching the current search will be included.':'')))return;$('opdf').disabled=true;const recs=[];let offset=0,total=0;try{const tp=layoutTpl();while(true){let path=`certificates?select=token,certificate_no,name,revoked,data&order=created_at.asc&limit=1000&offset=${offset}`+await hf();if(O.q){const q=O.q.replace(/[,()*\"\\%]/g,' ').trim();if(q)path+='&or='+encodeURIComponent(`(name.ilike.*${q}*,certificate_no.ilike.*${q}*)`)}const rows=await(await VER.api(path)).json();if(!rows.length)break;for(const row of rows){total++;recs.push(row)}ost(`Collecting certificates: ${total}…`);offset+=rows.length;if(rows.length<1000)break;}if(!recs.length)throw Error('No online records found.');const res=await ICESPDF.build(tp,recs.length,async k=>onlineItem(recs[k]),mopts(),(n,m)=>ost(`Building combined PDF: certificate ${n} of ${m}…`));await saveFile('ICES_All_Certificate_Records_'+new Date().toISOString().slice(0,10)+'.pdf',new Blob([res.pdf],{type:'application/pdf'}));ost(`<b class="ok">Done.</b> One PDF containing ${res.ok} certificate pages downloaded.`)}catch(e){ost(`<b class="bad">Export failed: ${esc(e.message)}</b>`)}finally{$('opdf').disabled=false}};
- const setRev=async(flag)=>{const t=selected();if(!t.length)return;let why=null;if(flag){why=prompt('Reason for revoking (shown to anyone who scans the QR):','');if(why===null)return}
-  if(!confirm(`${flag?'Revoke':'Restore'} ${t.length} certificate(s)?`))return;
-  try{for(let i=0;i<t.length;i+=50)await VER.api('certificates?'+inList(t.slice(i,i+50)),{method:'PATCH',headers:{Prefer:'return=minimal'},body:{revoked:flag,revoked_reason:flag?(why||null):null}});toast(flag?'Revoked.':'Restored.');load()}catch(e){ost('<b class="bad">'+esc(e.message)+'</b>')}};
- $('orev').onclick=()=>setRev(true);$('ores').onclick=()=>setRev(false);
- const hide=async(t)=>{if(!(await VER.hasHidden())){ost('<b class="warn">'+SQLMSG+'</b>');return false}for(let i=0;i<t.length;i+=50)await VER.api('certificates?'+inList(t.slice(i,i+50)),{method:'PATCH',headers:{Prefer:'return=minimal'},body:{hidden:true}});return true};
- $('odel').onclick=async()=>{const t=selected();if(!t.length)return;if(!confirm(`Remove ${t.length} record(s) from this list? Their QR codes keep working and the certificates stay verifiable.`))return;
-  try{if(await hide(t)){t.forEach(k=>O.sel.delete(k));toast('Removed from the list. QR codes still work.');load()}}catch(e){ost('<b class="bad">'+esc(e.message)+'</b>')}};
- $('odelp').onclick=async()=>{const t=selected();if(!t.length)return;if(prompt(`PERMANENTLY delete ${t.length} record(s)? Their QR links will STOP working for good and this cannot be undone.\n\nType DELETE to confirm:`,'')!=='DELETE')return;
-  try{for(let i=0;i<t.length;i+=50)await VER.api('certificates?'+inList(t.slice(i,i+50)),{method:'DELETE',headers:{Prefer:'return=minimal'}});t.forEach(k=>O.sel.delete(k));toast('Permanently deleted.');load()}catch(e){ost('<b class="bad">'+esc(e.message)+'</b>')}};
- $('oold').onclick=async()=>{const a=prompt('Remove the OLDEST how many records from the list? (their QR codes keep working)','100');const n=parseInt(a,10);if(!n||n<1)return;
-  try{const rows=await(await VER.api(`certificates?select=token&order=created_at.asc&limit=${n}`+await hf())).json();if(!rows.length)return toast('Nothing to remove.');
-   if(!confirm(`Remove the ${rows.length} oldest record(s) from the list? Their QR codes keep working.`))return;
-   if(await hide(rows.map(x=>x.token))){toast('Removed '+rows.length+' oldest record(s) from the list. QR codes still work.');O.sel.clear();load()}}catch(e){ost('<b class="bad">'+esc(e.message)+'</b>')}};
-
- $('oexp').onclick=async()=>{try{let all=[],off=0;for(;;){ost('Reading records… '+all.length);const rows=await(await VER.api(`certificates?select=*&order=id.asc&limit=1000&offset=${off}`)).json();all=all.concat(rows);if(rows.length<1000)break;off+=1000}
-  await saveFile('ICES_records_backup_'+new Date().toISOString().slice(0,10)+'.json',new Blob([JSON.stringify({exported:new Date().toISOString(),count:all.length,rows:all})],{type:'application/json'}));ost(`<b class="ok">Backup saved:</b> ${all.length} record(s). Keep it somewhere safe (for example Google Drive).`)}catch(e){ost('<b class="bad">'+esc(e.message)+'</b>')}};
- $('oimpf').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{const j=JSON.parse(await f.text()),rows=(Array.isArray(j)?j:j.rows||[]).map(({id,updated_at,...x})=>x);if(!rows.length)throw Error('No records found in this file.');
-  if(!confirm(`Restore ${rows.length} record(s) from this backup? Certificates with the same number are updated; others are kept.`))return;
-  for(let i=0;i<rows.length;i+=100){ost(`Restoring ${Math.min(i+100,rows.length)}/${rows.length}…`);await VER.api('certificates?on_conflict=certificate_no',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:rows.slice(i,i+100)})}
-  await load();ost(`<b class="ok">Restored ${rows.length} record(s).</b>`)}catch(x){ost('<b class="bad">'+esc(x.message)+'</b>')}};
- document.querySelector('nav button[data-t=onl]').addEventListener('click',()=>{O.page=0;load()});
-})();
-</script>
-</body></html>
+</script></body></html>
